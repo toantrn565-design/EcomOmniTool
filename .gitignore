@@ -1,0 +1,57 @@
+# Python Environments & Cache
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node
+node_modules/
+package-lock.json
+
+# Databases & SQLite
+*.db
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Configs, Secrets & Real User Accounts
+.env
+.env.*
+config/accounts.json
+config/settings.json
+accounts.json
+settings.json
+cookie*.json
+first_party_sets.db*
+
+# Browsers, Sessions & Profiles
+profiles/
+shopee_profile/
+profile_*/
+backend/profiles/
+*.lock
+lockfile
+Singleton*
+
+# Media, Downloads & Logs
+outputs/
+output/
+downloads/
+temp_downloads/
+cache/
+logs/
+*.mp4
+*.mov
+*.mp3
+*.wav
+*.zip
+*.log
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

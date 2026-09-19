@@ -1,0 +1,14 @@
+[
+    {
+        "id": "shop_example_1",
+        "name": "Shop Demo 1",
+        "type": "seller",
+        "platform": "shopee",
+        "profile_dir": "profile_shop_demo_1",
+        "video_folder": "C:/Videos/Shop1",
+        "proxy_server": "",
+        "proxy_username": "",
+        "proxy_password": "",
+        "status": "Chưa kết nối"
+    }
+]

@@ -1,0 +1,6 @@
+{
+    "gemini_api_key": "",
+    "default_caption_suffix": "\n#shopee #shopeevideo #affiliate #trending",
+    "delay_between_posts": 60,
+    "product_tagging_mode": "manual"
+}

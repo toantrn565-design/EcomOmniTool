@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecom OmniTool - Professional Suite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=4">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-layer-group logo-icon"></i>
+                <span class="logo-text">OmniTool Pro</span>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-label">Tự động hoá Bán hàng</div>
+                <a href="#" class="nav-item active" data-target="video-poster">
+                    <i class="fa-solid fa-video"></i>
+                    <span>Auto Video Poster</span>
+                </a>
+                <a href="#" class="nav-item" data-target="product-copier">
+                    <i class="fa-solid fa-copy"></i>
+                    <span>Product Copier</span>
+                </a>
+                <a href="#" class="nav-item" data-target="auto-boost">
+                    <i class="fa-solid fa-rocket"></i>
+                    <span>Auto Boost 4h</span>
+                </a>
+                <a href="#" class="nav-item" data-target="auto-flashsale">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>Auto Flash Sale</span>
+                </a>
+                <a href="#" class="nav-item" data-target="cron-scheduler-tab">
+                    <i class="fa-solid fa-clock"></i>
+                    <span>Hẹn Giờ Vàng</span>
+                </a>
+
+                <div class="nav-label">Trợ lý AI & Đồ Họa</div>
+                <a href="#" class="nav-item" data-target="ai-chat-consultant">
+                    <i class="fa-solid fa-headset"></i>
+                    <span>AI Sales Chatbot</span>
+                </a>
+                <a href="#" class="nav-item" data-target="ai-rewriter">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span>AI Content Rewriter</span>
+                </a>
+                <a href="#" class="nav-item" data-target="image-styler-tab">
+                    <i class="fa-solid fa-crop-simple"></i>
+                    <span>Đóng Khung 1:1</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="themeToggle" class="btn-icon" title="Chế độ Sáng/Tối">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <h1 id="pageTitle">Auto Video Poster</h1>
+                <div class="header-actions">
+                    <button class="btn btn-outline" onclick="openAccountsModal()">
+                        <i class="fa-solid fa-user-circle"></i> Quản lý Shop
+                    </button>
+                    <button class="btn btn-outline" onclick="openSettingsModal()">
+                        <i class="fa-solid fa-cog"></i> Cài đặt
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- MODULE 1: VIDEO POSTER -->
+                <section id="video-poster" class="module-section active">
+                    <div class="card">
+                        <h3><i class="fa-solid fa-upload"></i> Đăng Video Tiếp Thị Tự Động (Affiliate & Seller)</h3>
+                        <div class="form-group">
+                            <label>Chọn Shop để tải danh sách Video:</label>
+                            <select id="videoAccountSelect" class="form-control" onchange="onVideoAccountChange()"></select>
+                            
+                            <div class="mt-2" style="display: flex; gap: 10px;">
+                                <input type="text" id="quickVideoFolder" class="form-control" placeholder="Đường dẫn thư mục Video của Shop (VD: G:\Videos\ShopA)">
+                                <button class="btn btn-outline" style="white-space: nowrap;" onclick="saveQuickFolder()"><i class="fa-solid fa-folder-open"></i> Lưu Folder</button>
+                                <button class="btn btn-primary" style="white-space: nowrap;" onclick="loadVideos()"><i class="fa-solid fa-sync"></i> Quét Video</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group mt-3" style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+                            <label class="checkbox-label" style="font-weight: 600; color: #818cf8; cursor: pointer;">
+                                <input type="checkbox" id="sequentialModeToggle" onchange="toggleSequentialMode()"> 
+                                <i class="fa-solid fa-shuffle"></i> Chạy luân phiên tuần tự nhiều Shop (Đổi phiên đăng tránh spam)
+                            </label>
+                            <div id="sequentialShopsList" class="mt-2" style="display: none; flex-wrap: wrap; gap: 10px;"></div>
+                        </div>
+                        
+                        <div class="table-container mt-4">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;"><input type="checkbox" id="selectAllVideos"></th>
+                                        <th>Tên Video</th>
+                                        <th>Trạng thái</th>
+                                        <th>Mô tả (Caption)</th>
+                                        <th>Link SP gắn kèm</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="videoTableBody">
+                                    <tr><td colspan="5" style="text-align: center;">Chưa có dữ liệu</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="action-bar mt-4">
+                            <button class="btn btn-outline" onclick="saveVideosMetadata()"><i class="fa-solid fa-save"></i> Lưu thông tin</button>
+                            <button class="btn btn-success" onclick="startVideoUpload()"><i class="fa-solid fa-play"></i> Bắt đầu Đăng Video</button>
+                            <button class="btn btn-danger" onclick="stopVideoUpload()"><i class="fa-solid fa-stop"></i> Dừng</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MODULE 2: PRODUCT COPIER -->
+                <section id="product-copier" class="module-section">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3><i class="fa-solid fa-spider"></i> Quét Dữ Liệu Sản Phẩm</h3>
+                            
+                            <div class="form-group">
+                                <label>Nhập Link sản phẩm (Shopee/TikTok) hoặc Link Shop:</label>
+                                <textarea id="scrapeUrls" class="form-control" rows="4" placeholder="Mỗi link một dòng..."></textarea>
+                            </div>
+                            <div class="action-bar">
+                                <button class="btn btn-primary" onclick="scrapeSingleOrBulk()"><i class="fa-solid fa-download"></i> Cào Dữ Liệu</button>
+                                <button class="btn btn-outline" onclick="extractShopLinks()"><i class="fa-solid fa-store"></i> Quét Link Từ Shop</button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3><i class="fa-solid fa-cloud-upload"></i> Cấu Hình Đăng Bài</h3>
+                            
+                            <div class="form-group">
+                                <label>Chọn Shop Đích:</label>
+                                <select id="productAccountSelect" class="form-control"></select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Thương hiệu mặc định:</label>
+                                <input type="text" id="defaultBrand" class="form-control" value="No brand">
+                            </div>
+                            
+                            <div class="grid-2 gap-2 mt-2">
+                                <div class="form-group">
+                                    <label>Cân nặng mặc định (kg):</label>
+                                    <input type="number" id="defaultWeight" class="form-control" value="0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label>Kích thước (D x R x C cm):</label>
+                                    <div class="flex-row gap-1">
+                                        <input type="number" id="dimLength" class="form-control" value="10" placeholder="D">
+                                        <input type="number" id="dimWidth" class="form-control" value="10" placeholder="R">
+                                        <input type="number" id="dimHeight" class="form-control" value="10" placeholder="C">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="action-bar mt-4">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="autoPublishToggle"> Đăng lên ngay (Không lưu nháp)
+                                </label>
+                                <button class="btn btn-success" onclick="publishProductBulk()"><i class="fa-solid fa-paper-plane"></i> Bắt đầu Đăng Hàng Loạt</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MODULE 3: AUTO BOOST 4H -->
+                <section id="auto-boost" class="module-section">
+                    <div class="card">
+                        <div class="flex-between align-center">
+                            <div>
+                                <h3><i class="fa-solid fa-rocket"></i> Tự Động Đẩy Sản Phẩm (Auto Boost 4h/lần)</h3>
+                                <p class="text-muted">Shopee cho phép đẩy 5 sản phẩm mỗi 4 tiếng để đưa sản phẩm lên đầu kết quả tìm kiếm 'Mới nhất'.</p>
+                            </div>
+                            <div class="status-panel-compact">
+                                <span id="boostStatusBadge" class="badge-status badge-inactive">Đang dừng</span>
+                                <span id="boostCountdown" class="countdown-time">--:--:--</span>
+                            </div>
+                        </div>
+                        
+                        <div class="grid-3 gap-3 mt-3">
+                            <div class="form-group">
+                                <label>Chọn Shop Shopee:</label>
+                                <select id="boostAccountSelect" class="form-control" onchange="onBoostAccountChanged()"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Chế độ đẩy:</label>
+                                <select id="boostMode" class="form-control" onchange="toggleBoostMode()">
+                                    <option value="smart">Xoay tua tự động (Tất cả SP của Shop)</option>
+                                    <option value="selected">Chỉ định 5 sản phẩm ưu tiên đẩy bên dưới</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="display: flex; align-items: flex-end;">
+                                <button class="btn btn-primary w-100" onclick="fetchBoostShopProducts()"><i class="fa-solid fa-arrows-rotate"></i> Quét / Tải Sản Phẩm Shop</button>
+                            </div>
+                        </div>
+
+                        <!-- Bảng tìm kiếm và chọn sản phẩm để đẩy -->
+                        <div id="boostProductSelectionBox" class="mt-4" style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <div class="flex-between align-center mb-3">
+                                <div class="search-box-wrapper" style="flex: 1; max-width: 400px;">
+                                    <input type="text" id="boostProductSearchInput" class="form-control" placeholder="🔍 Tìm kiếm sản phẩm theo tên..." oninput="filterBoostProductList()">
+                                </div>
+                                <div class="selection-summary">
+                                    <span class="text-muted">Đã chọn:</span>
+                                    <strong id="boostSelectedCount" style="color: var(--primary); font-size: 1.05rem;">0</strong> / 5 sản phẩm
+                                    <button class="btn btn-outline btn-sm ml-2" onclick="clearBoostSelection()" style="padding: 4px 10px; font-size: 0.8rem;">Bỏ chọn</button>
+                                </div>
+                            </div>
+
+                            <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px; text-align: center;">Chọn</th>
+                                            <th style="width: 60px;">Ảnh</th>
+                                            <th>Tên Sản Phẩm</th>
+                                            <th>Giá / Tồn Kho</th>
+                                            <th>Trạng Thái</th>
+                                            <th style="text-align: center;">Thao Tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="boostProductTableBody">
+                                        <tr>
+                                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                                <i class="fa-solid fa-box-open" style="font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.5;"></i>
+                                                Nhấn <strong>"Quét / Tải Sản Phẩm Shop"</strong> để tải danh sách sản phẩm thực tế từ Kênh Người Bán.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="action-bar mt-4 flex-wrap">
+                            <button class="btn btn-success" onclick="startAutoBoost()"><i class="fa-solid fa-play"></i> Đẩy Shop Đang Chọn</button>
+                            <button class="btn btn-primary" onclick="startAutoBoostAll()"><i class="fa-solid fa-rocket"></i> Chạy Tất Cả Shop</button>
+                            <button class="btn btn-danger" onclick="stopAutoBoost()"><i class="fa-solid fa-stop"></i> Dừng Đẩy</button>
+                            <button class="btn btn-outline" onclick="openCurrentShopBrowser('boostAccountSelect')"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Kênh Shopee Trên Trình Duyệt</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MODULE 4: AUTO FLASH SALE -->
+                <section id="auto-flashsale" class="module-section">
+                    <div class="card">
+                        <div class="flex-between align-center">
+                            <div>
+                                <h3><i class="fa-solid fa-bolt"></i> Tự Động Tạo Flash Sale Của Shop</h3>
+                                <p class="text-muted">Tự động quét các khung giờ trống trong ngày trên Kênh Marketing và tạo chiến dịch Flash Sale để kích thích khách mua hàng.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="grid-3 gap-3 mt-3">
+                            <div class="form-group">
+                                <label>Chọn Shop:</label>
+                                <select id="flashsaleAccountSelect" class="form-control" onchange="onFlashSaleAccountChanged()"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Mức giảm giá (%):</label>
+                                <input type="number" id="fsDiscountPercent" class="form-control" value="10" min="1" max="90">
+                            </div>
+                            <div class="form-group">
+                                <label>Số lượng kho mở bán mỗi SP:</label>
+                                <input type="number" id="fsStockPerItem" class="form-control" value="10" min="1">
+                            </div>
+                        </div>
+
+                        <div class="grid-2 gap-3 mt-2">
+                            <div class="form-group">
+                                <label>Chế độ chọn sản phẩm:</label>
+                                <select id="fsSelectionMode" class="form-control" onchange="toggleFlashSaleMode()">
+                                    <option value="all">Tự động chọn các sản phẩm hàng đầu của Shop</option>
+                                    <option value="custom">Chỉ định danh sách sản phẩm tham gia bên dưới</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="display: flex; align-items: flex-end;">
+                                <button class="btn btn-primary w-100" onclick="fetchFlashSaleShopProducts()"><i class="fa-solid fa-arrows-rotate"></i> Quét / Tải Sản Phẩm Shop</button>
+                            </div>
+                        </div>
+
+                        <!-- Bảng tìm kiếm và chọn sản phẩm Flash Sale -->
+                        <div id="fsProductSelectionBox" class="mt-4" style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <div class="flex-between align-center mb-3">
+                                <div class="search-box-wrapper" style="flex: 1; max-width: 400px;">
+                                    <input type="text" id="fsProductSearchInput" class="form-control" placeholder="🔍 Tìm kiếm sản phẩm theo tên..." oninput="filterFlashSaleProductList()">
+                                </div>
+                                <div class="selection-summary">
+                                    <span class="text-muted">Đã chọn:</span>
+                                    <strong id="fsSelectedCount" style="color: #f59e0b; font-size: 1.05rem;">0</strong> sản phẩm
+                                    <button class="btn btn-outline btn-sm ml-2" onclick="selectAllFlashSale(true)" style="padding: 4px 10px; font-size: 0.8rem;">Chọn tất cả</button>
+                                    <button class="btn btn-outline btn-sm ml-1" onclick="selectAllFlashSale(false)" style="padding: 4px 10px; font-size: 0.8rem;">Bỏ chọn</button>
+                                </div>
+                            </div>
+
+                            <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px; text-align: center;">Chọn</th>
+                                            <th style="width: 60px;">Ảnh</th>
+                                            <th>Tên Sản Phẩm</th>
+                                            <th>Giá / Tồn Kho</th>
+                                            <th>Trạng Thái</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fsProductTableBody">
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                                <i class="fa-solid fa-bolt" style="font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.5;"></i>
+                                                Nhấn <strong>"Quét / Tải Sản Phẩm Shop"</strong> để xem danh sách sản phẩm tham gia Flash Sale.
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="action-bar mt-4">
+                            <button class="btn btn-primary" onclick="triggerAutoFlashSale()"><i class="fa-solid fa-bolt-lightning"></i> Tự Động Quét & Kích Hoạt Flash Sale Ngay</button>
+                            <button class="btn btn-outline" onclick="openCurrentShopBrowser('flashsaleAccountSelect')"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Kênh Shopee Trên Trình Duyệt</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MODULE 5: CRON SCHEDULER (HẸN GIỜ VÀNG) -->
+                <section id="cron-scheduler-tab" class="module-section">
+                    <div class="card">
+                        <h3><i class="fa-solid fa-clock"></i> Lên Lịch Tự Động Khung Giờ Vàng (Golden Hours)</h3>
+                        <p class="text-muted">Tự động kích hoạt Đăng Video / Flash Sale / Đẩy sản phẩm vào các khung giờ có lượng truy cập cao nhất (11h30 trưa, 20h00 tối).</p>
+                        
+                        <div class="grid-2 gap-3 mt-3">
+                            <div class="form-group">
+                                <label>Tác vụ cần chạy:</label>
+                                <select id="schedTaskType" class="form-control">
+                                    <option value="boost">🚀 Đẩy sản phẩm (Auto Boost 4h)</option>
+                                    <option value="flashsale">⚡ Tạo Flash Sale của Shop</option>
+                                    <option value="video">🎬 Đăng Video Tiếp Thị</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Khung giờ vàng (HH:MM):</label>
+                                <input type="time" id="schedTime" class="form-control" value="11:30">
+                            </div>
+                        </div>
+
+                        <div class="form-group mt-2">
+                            <label>Chọn Shop thực thi:</label>
+                            <select id="schedAccountSelect" class="form-control"></select>
+                        </div>
+
+                        <div class="action-bar mt-3">
+                            <button class="btn btn-primary" onclick="addCronSchedule()"><i class="fa-solid fa-plus"></i> Thêm Lịch Hẹn</button>
+                            <button class="btn btn-success" onclick="toggleScheduler(true)"><i class="fa-solid fa-play"></i> Bật Bộ Hẹn Giờ</button>
+                            <button class="btn btn-danger" onclick="toggleScheduler(false)"><i class="fa-solid fa-stop"></i> Dừng Bộ Hẹn Giờ</button>
+                        </div>
+
+                        <div class="table-container mt-4">
+                            <table class="table">
+                                <thead><tr><th>Tác vụ</th><th>Shop</th><th>Giờ chạy</th><th>Trạng thái</th><th>Xóa</th></tr></thead>
+                                <tbody id="scheduleTableBody">
+                                    <tr><td colspan="5" style="text-align: center;">Chưa có lịch hẹn nào.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MODULE 6: AI SALES CHATBOT -->
+                <section id="ai-chat-consultant" class="module-section">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3><i class="fa-solid fa-headset"></i> AI Sales Consultant (Tư vấn 24/7)</h3>
+                            <p class="text-muted">Tự động trả lời khách trong 15s, tư vấn chọn size, kiểm tra còn hàng, voucher và thúc đẩy chốt đơn đa Shop.</p>
+                            
+                            <div class="form-group mt-3">
+                                <label>Chọn Shop kích hoạt AI Chat:</label>
+                                <select id="chatAccountSelect" class="form-control"></select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Google Gemini API Key (Tùy chọn):</label>
+                                <input type="password" id="chatApiKey" class="form-control" placeholder="Để trống nếu đã cài đặt trong Cài đặt">
+                            </div>
+
+                            <div class="status-panel mt-3">
+                                <div>
+                                    <span class="countdown-label">Trạng thái AI:</span>
+                                    <span id="chatStatusBadge" class="badge-status badge-inactive">Chưa bật</span>
+                                </div>
+                            </div>
+
+                            <div class="action-bar mt-4 flex-wrap">
+                                <button class="btn btn-success" onclick="toggleAIChat('start')"><i class="fa-solid fa-robot"></i> Bật Shop Này</button>
+                                <button class="btn btn-primary" onclick="toggleAIChatAll('start')"><i class="fa-solid fa-network-wired"></i> Bật Tất Cả Shop</button>
+                                <button class="btn btn-danger" onclick="toggleAIChat('stop')"><i class="fa-solid fa-power-off"></i> Tắt Bot</button>
+                                <button class="btn btn-outline" onclick="openChatBrowser()"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Kênh Chat Shopee</button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3><i class="fa-solid fa-vial"></i> Thử Nghiệm Tương Tác Trực Tiếp Với AI</h3>
+                            <p class="text-muted">Gõ câu hỏi giả lập của khách hàng để kiểm tra phản hồi tư vấn thông minh của AI ngay lập tức.</p>
+                            
+                            <div class="form-group mt-3">
+                                <label>Nhập câu hỏi test:</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" id="chatTestInput" class="form-control" placeholder="Ví dụ: Shop ơi cao 1m68 nặng 60kg mặc size gì?" value="Shop ơi sản phẩm này còn hàng không và giao trong bao lâu?">
+                                    <button class="btn btn-primary" onclick="sendTestChat()" style="white-space: nowrap;"><i class="fa-solid fa-paper-plane"></i> Test AI</button>
+                                </div>
+                            </div>
+
+                            <div id="testChatResultBox" class="mt-3 p-3" style="background: rgba(15, 23, 42, 0.7); border-radius: 8px; border: 1px dashed var(--border-color); min-height: 80px;">
+                                <span class="text-muted" style="font-size: 0.9rem;">Kết quả phản hồi của AI sẽ hiển thị tại đây và được ghi vào bảng lịch sử bên dưới...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LỊCH SỬ TIN NHẮN REALTIME -->
+                    <div class="card mt-4">
+                        <div class="flex-between align-center mb-3">
+                            <div>
+                                <h3><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Tin Nhắn AI Đã Trả Lời Khách Hàng (Real-time Live Logs)</h3>
+                                <p class="text-muted">Ghi nhận toàn bộ các đoạn hội thoại thực tế mà AI đã tự động tư vấn và trả lời khách hàng của Shop.</p>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline btn-sm" onclick="loadChatHistory()"><i class="fa-solid fa-arrows-rotate"></i> Làm mới</button>
+                            </div>
+                        </div>
+
+                        <div class="table-container" style="max-height: 350px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 100px;">Thời gian</th>
+                                        <th style="width: 140px;">Shop</th>
+                                        <th style="width: 35%;">Tin nhắn khách hỏi</th>
+                                        <th>AI tự động trả lời</th>
+                                        <th style="width: 110px; text-align: center;">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="chatHistoryTableBody">
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                            <i class="fa-solid fa-comment-dots" style="font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.5;"></i>
+                                            Chưa có tin nhắn mới nào được ghi nhận trong phiên làm việc hiện tại.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MODULE 7: AI CONTENT REWRITER -->
+                <section id="ai-rewriter" class="module-section">
+                    <div class="card">
+                        <h3><i class="fa-solid fa-wand-magic-sparkles"></i> AI Viết Lại Tiêu Đề & Mô Tả Chuẩn SEO</h3>
+                        <p class="text-muted">Tự động đảo ngữ, cấu trúc lại bài viết để tránh lỗi phạt trùng lặp nội dung khi clone sản phẩm giữa các shop.</p>
+                        
+                        <div class="grid-2 gap-3 mt-3">
+                            <div>
+                                <div class="form-group">
+                                    <label>Tiêu đề gốc:</label>
+                                    <input type="text" id="rawTitle" class="form-control" placeholder="Nhập tiêu đề sản phẩm gốc...">
+                                </div>
+                                <div class="form-group">
+                                    <label>Mô tả gốc:</label>
+                                    <textarea id="rawDesc" class="form-control" rows="8" placeholder="Nhập mô tả sản phẩm gốc..."></textarea>
+                                </div>
+                                <button class="btn btn-primary mt-2" onclick="runAIRewrite()"><i class="fa-solid fa-bolt"></i> Tối ưu bằng AI</button>
+                            </div>
+
+                            <div>
+                                <div class="form-group">
+                                    <label>Tiêu đề mới (Chuẩn SEO):</label>
+                                    <input type="text" id="rewrittenTitle" class="form-control" readonly>
+                                </div>
+                                <div class="form-group">
+                                    <label>Mô tả mới (Icon & Bố cục chuẩn):</label>
+                                    <textarea id="rewrittenDesc" class="form-control" rows="8" readonly></textarea>
+                                </div>
+                                <button class="btn btn-outline mt-2" onclick="copyRewrittenContent()"><i class="fa-solid fa-copy"></i> Sao chép nội dung mới</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MODULE 8: IMAGE STYLER (ĐÓNG KHUNG ẢNH) -->
+                <section id="image-styler-tab" class="module-section">
+                    <div class="card">
+                        <h3><i class="fa-solid fa-crop-simple"></i> Đóng Khung Ảnh Tỷ Lệ 1:1 & Chèn Badge Khuyến Mãi</h3>
+                        <p class="text-muted">Tự động gắn khung viền Flash Sale, Freeship Extra và nhãn giảm giá bắt mắt vào ảnh sản phẩm.</p>
+                        
+                        <div class="grid-2 gap-3 mt-3">
+                            <div>
+                                <div class="form-group">
+                                    <label>Đường dẫn file ảnh hoặc URL:</label>
+                                    <input type="text" id="frameImgPath" class="form-control" placeholder="VD: G:\Images\product1.jpg">
+                                </div>
+                                <div class="form-group">
+                                    <label>Loại khung viền:</label>
+                                    <select id="frameType" class="form-control">
+                                        <option value="flashsale">🔥 Khung Flash Sale (Viền đỏ cam)</option>
+                                        <option value="freeship">🚚 Khung Freeship Extra (Viền xanh lá)</option>
+                                        <option value="voucher">⭐ Khung Voucher VIP (Viền vàng)</option>
+                                    </select>
+                                </div>
+                                <div class="grid-2 gap-2">
+                                    <div class="form-group">
+                                        <label>Tiêu đề Banner:</label>
+                                        <input type="text" id="frameBadgeText" class="form-control" value="CHÍNH HÃNG 100%">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Nhãn Giảm giá:</label>
+                                        <input type="text" id="frameDiscountTag" class="form-control" value="-50%">
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary mt-3" onclick="processImageFrame()"><i class="fa-solid fa-magic"></i> Tạo Ảnh Đóng Khung</button>
+                            </div>
+
+                            <div>
+                                <label>Ảnh Kết Quả Xem Trước:</label>
+                                <div id="framedImagePreview" style="margin-top: 8px; border: 1px dashed var(--border-color); border-radius: 12px; min-height: 250px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.2);">
+                                    <span class="text-muted">Chưa có ảnh đóng khung</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- LOG CONSOLE -->
+                <div class="log-console mt-4">
+                    <div class="log-header">
+                        <span><i class="fa-solid fa-terminal"></i> Terminal Logs</span>
+                        <button class="btn-icon" onclick="document.getElementById('logOutput').innerHTML = ''"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <div id="logOutput" class="log-body"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals cho Quản lý tài khoản và Cài đặt -->
+    <div id="accountsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Quản lý Shop (Accounts)</h2>
+                <button class="btn-icon" onclick="closeModal('accountsModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <button class="btn btn-primary mb-3" onclick="openEditAccountModal()"><i class="fa-solid fa-plus"></i> Thêm/Sửa Shop</button>
+                <table class="table">
+                    <thead><tr><th>Tên Shop</th><th>Nền tảng</th><th>Proxy</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+                    <tbody id="accountsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals cho Cài đặt -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content modal-md">
+            <div class="modal-header">
+                <h2>Cài đặt chung</h2>
+                <button class="btn-icon" onclick="closeModal('settingsModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Google Gemini API Key (Cho AI Chat & AI Rewrite):</label>
+                    <input type="password" id="settingGeminiApiKey" class="form-control" placeholder="AIzaSy...">
+                </div>
+                <div class="form-group">
+                    <label>Hậu tố Caption mặc định (Video):</label>
+                    <textarea id="settingCaptionSuffix" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Độ trễ giữa các bài đăng (giây):</label>
+                    <input type="number" id="settingDelay" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Chế độ gắn sản phẩm:</label>
+                    <select id="settingTaggingMode" class="form-control">
+                        <option value="manual">Theo từ khoá (manual)</option>
+                        <option value="auto">Tự động (auto - Lấy SP đầu tiên)</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="saveSettings()">Lưu cài đặt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals cho Thêm/Sửa Shop -->
+    <div id="editAccountModal" class="modal">
+        <div class="modal-content modal-md">
+            <div class="modal-header">
+                <h2 id="editAccountTitle">Thêm/Sửa Shop</h2>
+                <button class="btn-icon" onclick="closeModal('editAccountModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editAccountId">
+                <div class="form-group">
+                    <label>Tên Shop:</label>
+                    <input type="text" id="editAccountName" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Thư mục chứa Video (Đường dẫn tuyệt đối):</label>
+                    <input type="text" id="editAccountVideoFolder" class="form-control" placeholder="G:\ShopeeVideos\ShopA">
+                </div>
+                <div class="form-group">
+                    <label>Nền tảng:</label>
+                    <select id="editAccountPlatform" class="form-control">
+                        <option value="shopee">Shopee</option>
+                        <option value="tiktok">TikTok</option>
+                    </select>
+                </div>
+                <div class="form-group mt-3" style="border-top: 1px solid var(--border-color); padding-top: 10px;">
+                    <label><i class="fa-solid fa-network-wired"></i> Cấu hình Proxy (Tùy chọn - Chống quét IP):</label>
+                    <input type="text" id="editAccountProxyServer" class="form-control mt-1" placeholder="IP:Port hoặc http://123.45.67.89:8080">
+                </div>
+                <div class="grid-2 gap-2 mt-1">
+                    <div class="form-group">
+                        <input type="text" id="editAccountProxyUser" class="form-control" placeholder="Proxy Username">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="editAccountProxyPass" class="form-control" placeholder="Proxy Password">
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-3" onclick="saveAccount()">Lưu Shop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
+
+    <script src="/app.js?v=4"></script>
+</body>
+</html>
