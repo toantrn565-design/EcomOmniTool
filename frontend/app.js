@@ -198,6 +198,18 @@ async function checkAccount(id) {
     } catch(e) { showToast("Lỗi kiểm tra trạng thái!", "error"); }
 }
 
+function toggleAuthModeFields() {
+    const mode = document.getElementById('editAccountAuthMode').value;
+    const platform = document.getElementById('editAccountPlatform').value;
+    const shopeeBox = document.getElementById('shopeeApiFields');
+    const tiktokBox = document.getElementById('tiktokApiFields');
+    const mcpBox = document.getElementById('mcpFields');
+    
+    if (shopeeBox) shopeeBox.style.display = (mode === 'api' && platform === 'shopee') ? 'block' : 'none';
+    if (tiktokBox) tiktokBox.style.display = (mode === 'api' && platform === 'tiktok') ? 'block' : 'none';
+    if (mcpBox) mcpBox.style.display = (mode === 'mcp') ? 'block' : 'none';
+}
+
 function openEditAccountModal(id = null) {
     openModal('editAccountModal');
     document.getElementById('editAccountId').value = id || '';
@@ -209,6 +221,21 @@ function openEditAccountModal(id = null) {
         document.getElementById('editAccountProxyServer').value = "";
         document.getElementById('editAccountProxyUser').value = "";
         document.getElementById('editAccountProxyPass').value = "";
+        document.getElementById('editAccountAuthMode').value = "browser";
+        
+        document.getElementById('editShopeePartnerId').value = "";
+        document.getElementById('editShopeeShopId').value = "";
+        document.getElementById('editShopeePartnerKey').value = "";
+        document.getElementById('editShopeeAccessToken').value = "";
+        
+        document.getElementById('editTikTokAppKey').value = "";
+        document.getElementById('editTikTokShopCipher').value = "";
+        document.getElementById('editTikTokAppSecret').value = "";
+        document.getElementById('editTikTokAccessToken').value = "";
+        
+        document.getElementById('editMcpUrl').value = "";
+        document.getElementById('editMcpToken').value = "";
+        toggleAuthModeFields();
     } else {
         document.getElementById('editAccountTitle').textContent = "Sửa Thông Tin Shop";
         fetch("/api/accounts").then(res => res.json()).then(accounts => {
@@ -220,6 +247,21 @@ function openEditAccountModal(id = null) {
                 document.getElementById('editAccountProxyServer').value = acc.proxy_server || '';
                 document.getElementById('editAccountProxyUser').value = acc.proxy_username || '';
                 document.getElementById('editAccountProxyPass').value = acc.proxy_password || '';
+                document.getElementById('editAccountAuthMode').value = acc.auth_mode || 'browser';
+                
+                document.getElementById('editShopeePartnerId').value = acc.shopee_partner_id || '';
+                document.getElementById('editShopeeShopId').value = acc.shopee_shop_id || '';
+                document.getElementById('editShopeePartnerKey').value = acc.shopee_partner_key || '';
+                document.getElementById('editShopeeAccessToken').value = acc.shopee_access_token || '';
+                
+                document.getElementById('editTikTokAppKey').value = acc.tiktok_app_key || '';
+                document.getElementById('editTikTokShopCipher').value = acc.tiktok_shop_cipher || '';
+                document.getElementById('editTikTokAppSecret').value = acc.tiktok_app_secret || '';
+                document.getElementById('editTikTokAccessToken').value = acc.tiktok_access_token || '';
+                
+                document.getElementById('editMcpUrl').value = acc.mcp_url || '';
+                document.getElementById('editMcpToken').value = acc.mcp_token || '';
+                toggleAuthModeFields();
             }
         });
     }
@@ -233,6 +275,7 @@ async function saveAccount() {
     const proxy_server = document.getElementById('editAccountProxyServer').value.trim();
     const proxy_username = document.getElementById('editAccountProxyUser').value.trim();
     const proxy_password = document.getElementById('editAccountProxyPass').value.trim();
+    const auth_mode = document.getElementById('editAccountAuthMode').value;
     
     if(!name) { showToast("Vui lòng nhập tên Shop!", "warning"); return; }
     
@@ -246,7 +289,18 @@ async function saveAccount() {
         proxy_server: proxy_server,
         proxy_username: proxy_username,
         proxy_password: proxy_password,
-        status: "Chưa kết nối"
+        status: auth_mode === 'api' ? 'Đã kết nối (API)' : 'Chưa kết nối',
+        auth_mode: auth_mode,
+        shopee_partner_id: document.getElementById('editShopeePartnerId').value.trim(),
+        shopee_shop_id: document.getElementById('editShopeeShopId').value.trim(),
+        shopee_partner_key: document.getElementById('editShopeePartnerKey').value.trim(),
+        shopee_access_token: document.getElementById('editShopeeAccessToken').value.trim(),
+        tiktok_app_key: document.getElementById('editTikTokAppKey').value.trim(),
+        tiktok_shop_cipher: document.getElementById('editTikTokShopCipher').value.trim(),
+        tiktok_app_secret: document.getElementById('editTikTokAppSecret').value.trim(),
+        tiktok_access_token: document.getElementById('editTikTokAccessToken').value.trim(),
+        mcp_url: document.getElementById('editMcpUrl').value.trim(),
+        mcp_token: document.getElementById('editMcpToken').value.trim()
     };
     
     try {

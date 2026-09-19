@@ -161,6 +161,17 @@ class AccountModel(BaseModel):
     proxy_username: Optional[str] = ""
     proxy_password: Optional[str] = ""
     status: str = "Chưa kết nối"
+    auth_mode: Optional[str] = "browser"
+    shopee_partner_id: Optional[str] = ""
+    shopee_partner_key: Optional[str] = ""
+    shopee_shop_id: Optional[str] = ""
+    shopee_access_token: Optional[str] = ""
+    tiktok_app_key: Optional[str] = ""
+    tiktok_app_secret: Optional[str] = ""
+    tiktok_shop_cipher: Optional[str] = ""
+    tiktok_access_token: Optional[str] = ""
+    mcp_url: Optional[str] = ""
+    mcp_token: Optional[str] = ""
 
 class ImageFrameRequest(BaseModel):
     image_url_or_path: str
@@ -718,6 +729,42 @@ async def get_boost_products(account_id: str):
     accounts = load_accounts()
     account = next((a for a in accounts if a["id"] == account_id), None)
     if not account: raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản.")
+    
+    # 1. Kiểm tra nếu tài khoản có cài đặt Shopee Open API chính thức
+    if account.get("shopee_partner_id") and account.get("shopee_partner_key") and account.get("shopee_access_token"):
+        try:
+            from backend.ecom_api_client import ShopeeOpenAPI
+            client = ShopeeOpenAPI(
+                partner_id=int(account["shopee_partner_id"]),
+                partner_key=account["shopee_partner_key"],
+                shop_id=int(account.get("shopee_shop_id") or 0),
+                access_token=account["shopee_access_token"]
+            )
+            prods = client.get_products()
+            if prods:
+                await log_to_ui(f"✅ Đã tải thành công {len(prods)} sản phẩm qua Shopee Open API chính thức!")
+                return prods
+        except Exception as e:
+            await log_to_ui(f"⚠️ Lỗi gọi Shopee Open API: {e}. Đang chuyển sang quét tự động...")
+
+    # 2. Kiểm tra nếu dùng TikTok Shop Open API
+    if (account.get("platform") == "tiktok" or account.get("tiktok_app_key")) and account.get("tiktok_access_token"):
+        try:
+            from backend.ecom_api_client import TikTokShopAPI
+            client = TikTokShopAPI(
+                app_key=account.get("tiktok_app_key", ""),
+                app_secret=account.get("tiktok_app_secret", ""),
+                access_token=account.get("tiktok_access_token", ""),
+                shop_cipher=account.get("tiktok_shop_cipher", "")
+            )
+            prods = client.get_products()
+            if prods:
+                await log_to_ui(f"✅ Đã tải thành công {len(prods)} sản phẩm qua TikTok Shop Open API!")
+                return prods
+        except Exception as e:
+            await log_to_ui(f"⚠️ Lỗi gọi TikTok Shop API: {e}.")
+
+    # 3. Fallback qua Browser Automation Session
     profile_dir = account.get("profile_dir")
     lock = get_profile_lock(profile_dir)
     async with lock:
@@ -805,14 +852,7 @@ def get_boost_status():
 
 @app.get("/api/flashsale/products")
 async def get_flashsale_products(account_id: str):
-    accounts = load_accounts()
-    account = next((a for a in accounts if a["id"] == account_id), None)
-    if not account: raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản.")
-    profile_dir = account.get("profile_dir")
-    lock = get_profile_lock(profile_dir)
-    async with lock:
-        booster = ShopeeProductBooster(profile_dir=profile_dir)
-        return await booster.get_products_list(log_callback=log_to_ui)
+    return await get_boost_products(account_id)
 
 async def run_flashsale_task(account_id: str, discount_percent: int, stock_per_item: int, target_product_count: int, selected_products: Optional[List[str]]):
     accounts = load_accounts()

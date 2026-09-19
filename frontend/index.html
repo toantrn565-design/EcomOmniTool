@@ -641,6 +641,76 @@
                         <input type="password" id="editAccountProxyPass" class="form-control" placeholder="Proxy Password">
                     </div>
                 </div>
+
+                <!-- Cấu hình Official API & MCP -->
+                <div class="form-group mt-3" style="border-top: 1px solid var(--border-color); padding-top: 12px;">
+                    <label><i class="fa-solid fa-plug-circle-bolt" style="color: #38bdf8;"></i> Chế độ xác thực & Kết nối Dữ liệu:</label>
+                    <select id="editAccountAuthMode" class="form-control mt-1" onchange="toggleAuthModeFields()">
+                        <option value="browser">🌐 Trình duyệt tự động (Playwright Session)</option>
+                        <option value="api">⚡ Official Open API (Shopee Partner / TikTok API)</option>
+                        <option value="mcp">🔌 MCP Server Bridge (Model Context Protocol)</option>
+                    </select>
+                </div>
+
+                <!-- Shopee API Fields -->
+                <div id="shopeeApiFields" class="mt-2 p-3" style="background: rgba(238, 77, 45, 0.08); border-radius: 8px; border: 1px solid rgba(238, 77, 45, 0.2); display: none;">
+                    <h4 style="font-size: 0.85rem; color: #f97316; margin-bottom: 8px;"><i class="fa-solid fa-key"></i> Thông tin Shopee Open Platform API v2:</h4>
+                    <div class="grid-2 gap-2">
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Partner ID:</label>
+                            <input type="text" id="editShopeePartnerId" class="form-control" placeholder="VD: 100234">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Shop ID:</label>
+                            <input type="text" id="editShopeeShopId" class="form-control" placeholder="VD: 456789">
+                        </div>
+                    </div>
+                    <div class="form-group mt-1">
+                        <label style="font-size: 0.8rem;">Partner Key (Secret):</label>
+                        <input type="password" id="editShopeePartnerKey" class="form-control" placeholder="78af98bc...">
+                    </div>
+                    <div class="form-group mt-1">
+                        <label style="font-size: 0.8rem;">Access Token:</label>
+                        <input type="password" id="editShopeeAccessToken" class="form-control" placeholder="Bearer Token...">
+                    </div>
+                </div>
+
+                <!-- TikTok API Fields -->
+                <div id="tiktokApiFields" class="mt-2 p-3" style="background: rgba(0, 242, 234, 0.08); border-radius: 8px; border: 1px solid rgba(0, 242, 234, 0.2); display: none;">
+                    <h4 style="font-size: 0.85rem; color: #06b6d4; margin-bottom: 8px;"><i class="fa-solid fa-key"></i> Thông tin TikTok Shop Open API:</h4>
+                    <div class="grid-2 gap-2">
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">App Key:</label>
+                            <input type="text" id="editTikTokAppKey" class="form-control" placeholder="6abc123...">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size: 0.8rem;">Shop Cipher / ID:</label>
+                            <input type="text" id="editTikTokShopCipher" class="form-control" placeholder="GBSHOP...">
+                        </div>
+                    </div>
+                    <div class="form-group mt-1">
+                        <label style="font-size: 0.8rem;">App Secret:</label>
+                        <input type="password" id="editTikTokAppSecret" class="form-control" placeholder="secret...">
+                    </div>
+                    <div class="form-group mt-1">
+                        <label style="font-size: 0.8rem;">Access Token:</label>
+                        <input type="password" id="editTikTokAccessToken" class="form-control" placeholder="Token...">
+                    </div>
+                </div>
+
+                <!-- MCP Server Fields -->
+                <div id="mcpFields" class="mt-2 p-3" style="background: rgba(99, 102, 241, 0.08); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.2); display: none;">
+                    <h4 style="font-size: 0.85rem; color: #818cf8; margin-bottom: 8px;"><i class="fa-solid fa-cubes"></i> Cấu hình MCP Server Protocol:</h4>
+                    <div class="form-group">
+                        <label style="font-size: 0.8rem;">MCP Server Endpoint URL:</label>
+                        <input type="text" id="editMcpUrl" class="form-control" placeholder="http://127.0.0.1:7777/hub/mcp">
+                    </div>
+                    <div class="form-group mt-1">
+                        <label style="font-size: 0.8rem;">Authorization Bearer Token:</label>
+                        <input type="password" id="editMcpToken" class="form-control" placeholder="Bearer Token...">
+                    </div>
+                </div>
+
                 <button class="btn btn-primary mt-3" onclick="saveAccount()">Lưu Shop</button>
             </div>
         </div>
