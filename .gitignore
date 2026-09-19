@@ -43,6 +43,8 @@ downloads/
 temp_downloads/
 cache/
 logs/
+scratch/
+browser_profiles/
 *.mp4
 *.mov
 *.mp3

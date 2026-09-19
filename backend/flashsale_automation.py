@@ -11,15 +11,8 @@ logger = logging.getLogger("FlashSaleScheduler")
 
 class FlashSaleScheduler:
     def __init__(self, profile_dir: str):
-        if os.path.isabs(profile_dir):
-            self.profile_dir = profile_dir
-        else:
-            self.profile_dir = os.path.abspath(os.path.join(
-                os.path.dirname(__file__), "..", "..", "ShopeeVideoAutoPoster", profile_dir
-            ))
-            if not os.path.exists(self.profile_dir):
-                self.profile_dir = os.path.abspath(profile_dir)
-
+        from backend.profile_utils import resolve_profile_path
+        self.profile_dir = resolve_profile_path(profile_dir)
         os.makedirs(self.profile_dir, exist_ok=True)
         self.playwright = None
         self.context: Optional[BrowserContext] = None

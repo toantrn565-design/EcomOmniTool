@@ -7,19 +7,13 @@ from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright, Page, BrowserContext
 from backend.video_automation import cleanup_stale_profile
 
+from backend.profile_utils import resolve_profile_path
+
 logger = logging.getLogger("ProductBooster")
 
 class ShopeeProductBooster:
     def __init__(self, profile_dir: str):
-        if os.path.isabs(profile_dir):
-            self.profile_dir = profile_dir
-        else:
-            self.profile_dir = os.path.abspath(os.path.join(
-                os.path.dirname(__file__), "..", "..", "ShopeeVideoAutoPoster", profile_dir
-            ))
-            if not os.path.exists(self.profile_dir):
-                self.profile_dir = os.path.abspath(profile_dir)
-
+        self.profile_dir = resolve_profile_path(profile_dir)
         os.makedirs(self.profile_dir, exist_ok=True)
         self.playwright = None
         self.context: Optional[BrowserContext] = None
@@ -113,12 +107,18 @@ class ShopeeProductBooster:
         captured_api_products = []
         seen_names = set()
 
+        blacklist_terms = [
+            "ảnh sản phẩm", "tên sản phẩm", "sản phẩm", "hình ảnh", "thao tác", 
+            "kho hàng", "giá", "chọn tất cả", "tất cả", "cập nhật", "chỉnh sửa", 
+            "xem thêm", "đẩy sản phẩm", "đang đẩy", "có thể đẩy", "đánh giá sản phẩm", 
+            "hiệu suất", "tồn kho", "sẵn sàng", "phân loại", "mã sku", "chi tiết", "xóa"
+        ]
+
         def clean_product_name(raw_name: str) -> str:
             if not raw_name:
                 return ""
             name = raw_name.strip()
-            # Bỏ các tiền tố / hậu tố giao diện thừa
-            for junk in ["Ảnh sản phẩm", "Tên sản phẩm", "Hình ảnh", "Sản phẩm", "Mã SKU", "Kho hàng", "Thao tác", "Chỉnh sửa"]:
+            for junk in ["Ảnh sản phẩm", "Tên sản phẩm", "Hình ảnh", "Sản phẩm", "Mã SKU", "Kho hàng", "Thao tác", "Chỉnh sửa", "Cập nhật"]:
                 if name.lower().startswith(junk.lower()):
                     name = name[len(junk):].strip()
             return name
@@ -127,10 +127,55 @@ class ShopeeProductBooster:
             if not name or len(name) < 4:
                 return False
             name_low = name.lower()
-            blacklisted = ["ảnh sản phẩm", "tên sản phẩm", "sản phẩm", "hình ảnh", "thao tác", "kho hàng", "giá", "chọn tất cả", "tất cả"]
-            if name_low in blacklisted:
-                return False
+            for b in blacklist_terms:
+                if name_low == b or name_low.startswith(b + ":"):
+                    return False
             return True
+
+        def format_product_item(it: dict) -> Optional[dict]:
+            prod_name = clean_product_name(it.get("name") or it.get("item_name") or "")
+            if not is_valid_product(prod_name) or prod_name in seen_names:
+                return None
+            seen_names.add(prod_name)
+
+            prod_id = str(it.get("id") or it.get("item_id") or it.get("product_id") or "")
+            
+            # Format cover image
+            image_id = ""
+            if it.get("images") and isinstance(it.get("images"), list) and len(it.get("images")) > 0:
+                image_id = it.get("images")[0]
+            elif it.get("cover_image"):
+                image_id = it.get("cover_image")
+            elif it.get("image"):
+                image_id = it.get("image")
+
+            img_url = ""
+            if image_id:
+                if image_id.startswith("http"):
+                    img_url = image_id
+                else:
+                    img_url = f"https://down-vn.img.susercontent.com/file/{image_id}"
+
+            price_val = it.get("price") or it.get("min_price") or it.get("current_price") or "0"
+            try:
+                price_float = float(price_val)
+                price_str = f"{price_float:,.0f} đ" if price_float > 0 else "Sẵn sàng"
+            except Exception:
+                price_str = str(price_val)
+
+            stock_val = it.get("stock") or it.get("total_stock") or it.get("normal_stock") or "Còn hàng"
+            boost_end = it.get("boost_cool_down_seconds", 0) or it.get("boost_cooldown", 0)
+            is_boosted = boost_end > 0
+
+            return {
+                "id": prod_id or f"sp_{len(captured_api_products)+1}",
+                "name": prod_name,
+                "image": img_url,
+                "price": price_str,
+                "stock": str(stock_val),
+                "is_boosted": is_boosted,
+                "boost_status": "Đang đẩy" if is_boosted else "Có thể đẩy"
+            }
 
         try:
             await self.init_browser(headless=True)
@@ -140,31 +185,20 @@ class ShopeeProductBooster:
             async def handle_response(response):
                 try:
                     url = response.url
-                    if any(api in url for api in ["/api/v3/product/search_product_list/", "/api/v3/product/get_product_list_filter/", "/api/v3/product/list/", "/api/v3/product/get_product_list/"]):
+                    if any(api in url for api in ["get_product_list", "search_product_list", "get_boost_info"]):
                         if response.status == 200:
                             data = await response.json()
-                            items = data.get("data", {}).get("products", []) or data.get("data", {}).get("list", []) or data.get("products", [])
+                            items = (
+                                data.get("data", {}).get("products", []) or 
+                                data.get("data", {}).get("list", []) or 
+                                data.get("data", {}).get("mpsku_list", []) or 
+                                data.get("products", []) or 
+                                []
+                            )
                             for it in items:
-                                prod_name = clean_product_name(it.get("name") or it.get("item_name") or "")
-                                if not is_valid_product(prod_name) or prod_name in seen_names:
-                                    continue
-                                seen_names.add(prod_name)
-                                prod_id = str(it.get("id") or it.get("item_id") or "")
-                                image_id = it.get("images", [""])[0] if it.get("images") else (it.get("cover_image") or "")
-                                img_url = f"https://down-vn.img.susercontent.com/file/{image_id}" if image_id and not image_id.startswith("http") else image_id
-                                price_val = it.get("price") or it.get("min_price") or "0"
-                                stock_val = it.get("stock") or it.get("total_stock") or "0"
-                                boost_end = it.get("boost_cool_down_seconds", 0)
-                                is_boosted = boost_end > 0
-                                captured_api_products.append({
-                                    "id": prod_id,
-                                    "name": prod_name,
-                                    "image": img_url,
-                                    "price": f"{float(price_val):,.0f} đ" if str(price_val).replace('.','').isdigit() and float(price_val) > 1000 else str(price_val),
-                                    "stock": str(stock_val),
-                                    "is_boosted": is_boosted,
-                                    "boost_status": "Đang đẩy" if is_boosted else "Có thể đẩy"
-                                })
+                                p_obj = format_product_item(it)
+                                if p_obj:
+                                    captured_api_products.append(p_obj)
                 except Exception:
                     pass
 
@@ -179,16 +213,16 @@ class ShopeeProductBooster:
             # Kiểm tra đăng nhập
             if "login" in self.page.url.lower():
                 if log_callback:
-                    await log_callback("⚠️ Tài khoản chưa đăng nhập vào Kênh Người Bán Shopee. Vui lòng đăng nhập trong 'Quản lý Shop'.")
+                    await log_callback("⚠️ Tài khoản chưa đăng nhập vào Kênh Người Bán Shopee. Vui lòng nhấn 'Quản lý Shop' -> 'Đăng nhập' để xác thực.")
                 return []
 
-            # Thử gọi trực tiếp API Shopee qua JS evaluate
+            # Thử gọi trực tiếp API Shopee qua JS evaluate (nếu bắt network chưa đủ)
             if not captured_api_products:
                 try:
                     js_data = await self.page.evaluate("""
                         async () => {
                             try {
-                                const res = await fetch('/api/v3/product/search_product_list/?page_number=1&page_size=48&source=seller_center_web', {credentials: 'include'});
+                                const res = await fetch('/api/v3/opt/mpsku/list/v2/get_product_list?page_number=1&page_size=48&list_type=all&need_ads=true', {credentials: 'include'});
                                 if (res.ok) {
                                     return await res.json();
                                 }
@@ -198,26 +232,9 @@ class ShopeeProductBooster:
                     """)
                     if js_data and js_data.get("data", {}).get("products"):
                         for it in js_data["data"]["products"]:
-                            prod_name = clean_product_name(it.get("name") or it.get("item_name") or "")
-                            if not is_valid_product(prod_name) or prod_name in seen_names:
-                                continue
-                            seen_names.add(prod_name)
-                            prod_id = str(it.get("id") or it.get("item_id") or "")
-                            image_id = it.get("images", [""])[0] if it.get("images") else ""
-                            img_url = f"https://down-vn.img.susercontent.com/file/{image_id}" if image_id and not image_id.startswith("http") else image_id
-                            price_val = it.get("price") or it.get("min_price") or "0"
-                            stock_val = it.get("stock") or it.get("total_stock") or "0"
-                            boost_end = it.get("boost_cool_down_seconds", 0)
-                            is_boosted = boost_end > 0
-                            captured_api_products.append({
-                                "id": prod_id,
-                                "name": prod_name,
-                                "image": img_url,
-                                "price": f"{float(price_val):,.0f} đ" if str(price_val).replace('.','').isdigit() and float(price_val) > 1000 else str(price_val),
-                                "stock": str(stock_val),
-                                "is_boosted": is_boosted,
-                                "boost_status": "Đang đẩy" if is_boosted else "Có thể đẩy"
-                            })
+                            p_obj = format_product_item(it)
+                            if p_obj:
+                                captured_api_products.append(p_obj)
                 except Exception:
                     pass
 
@@ -227,27 +244,39 @@ class ShopeeProductBooster:
                 return captured_api_products
 
             # Fallback DOM Parsing chính xác cao
-            rows = await self.page.locator(".product-item-row, .shopee-table-row, tr.product-row, .product-item").all()
-            if not rows:
-                rows = await self.page.locator(".shopee-table tbody tr").all()
+            rows = await self.page.locator(".product-item-row, .shopee-table-row, tr.product-row, .shopee-table tbody tr").all()
 
             if log_callback:
                 await log_callback(f"Đang phân tích giao diện danh sách ({len(rows)} hàng)...")
 
             for idx, row in enumerate(rows):
                 try:
-                    # Trích xuất tên từ các selector tiêu đề cụ thể thay vì toàn bộ text của dòng
                     name = ""
-                    name_locator = row.locator(".product-name, .item-name, .product-title, .name-text, a[href*='product'], div[class*='name']").first
-                    if await name_locator.is_visible():
-                        name = await name_locator.inner_text()
+                    # Ưu tiên tìm đúng thẻ chứa tên sản phẩm
+                    name_selectors = [
+                        ".product-name", 
+                        "[data-testid='product-name']", 
+                        "div.mpsku-product-name", 
+                        ".item-title", 
+                        ".product-title", 
+                        ".name-text", 
+                        "a[href*='product/edit']",
+                        "a[href*='portal/product']"
+                    ]
+                    for sel in name_selectors:
+                        el = row.locator(sel).first
+                        if await el.is_visible():
+                            cand = await el.inner_text()
+                            if cand and len(cand.strip()) >= 4 and not any(b == cand.strip().lower() for b in blacklist_terms):
+                                name = cand.strip()
+                                break
                     
                     if not name:
                         text_content = await row.inner_text()
                         lines = [l.strip() for l in text_content.split("\n") if l.strip()]
                         for line in lines:
                             line_clean = clean_product_name(line)
-                            if len(line_clean) > 8 and not any(k in line_clean.lower() for k in ["mã sku", "kho:", "giá:", "đang đẩy", "thao tác", "chỉnh sửa", "phân loại"]):
+                            if len(line_clean) > 8 and is_valid_product(line_clean):
                                 name = line_clean
                                 break
 
@@ -256,11 +285,13 @@ class ShopeeProductBooster:
                         continue
                     seen_names.add(name)
 
-                    # Lấy ảnh
+                    # Lấy ảnh sản phẩm
                     img_el = row.locator("img").first
                     img_src = ""
                     if await img_el.is_visible():
                         img_src = await img_el.get_attribute("src") or ""
+                        if "buybox_label" in img_src or "base64" in img_src:
+                            img_src = ""
 
                     text_all = await row.inner_text()
                     is_boosted = "đang đẩy" in text_all.lower() or "còn 0" in text_all.lower()

@@ -10,15 +10,8 @@ logger = logging.getLogger("ListingUploader")
 
 class ProductUploader:
     def __init__(self, profile_dir: str):
-        # Đường dẫn profile dir relative từ thư mục ShopeeVideoAutoPoster hoặc tuyệt đối
-        if os.path.isabs(profile_dir):
-            self.profile_dir = profile_dir
-        else:
-            # Ưu tiên lấy từ thư mục của dự án ShopeeVideoAutoPoster bên cạnh
-            self.profile_dir = os.path.abspath(os.path.join(
-                os.path.dirname(__file__), "..", "..", "ShopeeVideoAutoPoster", profile_dir
-            ))
-            
+        from backend.profile_utils import resolve_profile_path
+        self.profile_dir = resolve_profile_path(profile_dir)
         os.makedirs(self.profile_dir, exist_ok=True)
         self.playwright = None
         self.context: BrowserContext = None

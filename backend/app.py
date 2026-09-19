@@ -37,18 +37,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Thư mục chứa tài khoản cấu hình (Liên kết với tool cũ)
-SHOPEE_POSTER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "ShopeeVideoAutoPoster"))
-CONFIG_DIR = os.path.join(SHOPEE_POSTER_DIR, "config")
+# Thư mục chứa tài khoản cấu hình (Liên kết dùng chung với tool cũ nếu có)
+from backend.profile_utils import get_shared_config_dir, resolve_profile_path
+CONFIG_DIR = get_shared_config_dir()
 CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
 ACCOUNTS_FILE = os.path.join(CONFIG_DIR, "accounts.json")
-
-# Nếu thư mục config cũ không tồn tại, tạo mới nội bộ
-if not os.path.exists(CONFIG_DIR):
-    CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config"))
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-    CONFIG_FILE = os.path.join(CONFIG_DIR, "settings.json")
-    ACCOUNTS_FILE = os.path.join(CONFIG_DIR, "accounts.json")
 
 # --- WebSocket & Logs Manager ---
 class ConnectionManager:
