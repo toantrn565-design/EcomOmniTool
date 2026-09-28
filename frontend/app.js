@@ -37,8 +37,25 @@ function initWebsocket() {
     const logOutput = document.getElementById('logOutput');
     
     ws.onmessage = (event) => {
+        const text = event.data || "";
         const p = document.createElement("div");
-        p.textContent = event.data;
+        p.style.marginBottom = "3px";
+        p.style.lineHeight = "1.5";
+        p.style.wordBreak = "break-word";
+        
+        if (text.includes("✅") || text.includes("thành công") || text.includes("Success")) {
+            p.style.color = "#4ade80";
+        } else if (text.includes("❌") || text.includes("Lỗi") || text.includes("Error") || text.includes("thất bại")) {
+            p.style.color = "#f87171";
+        } else if (text.includes("⚠️") || text.includes("cảnh báo") || text.includes("Warning")) {
+            p.style.color = "#fbbf24";
+        } else if (text.includes("🚀") || text.includes("🔍") || text.includes("⚡") || text.includes("Bắt đầu")) {
+            p.style.color = "#38bdf8";
+        } else {
+            p.style.color = "#cbd5e1";
+        }
+        
+        p.textContent = text;
         logOutput.appendChild(p);
         logOutput.scrollTop = logOutput.scrollHeight;
     };
@@ -148,6 +165,7 @@ async function loadAccountsForSelects() {
         }
 
         onVideoAccountChange();
+        onBoostAccountChanged();
     } catch(e) {
         console.error("Lỗi tải danh sách tài khoản", e);
     }
@@ -222,6 +240,9 @@ function openEditAccountModal(id = null) {
         document.getElementById('editAccountProxyUser').value = "";
         document.getElementById('editAccountProxyPass').value = "";
         document.getElementById('editAccountAuthMode').value = "browser";
+        if (document.getElementById('editAccountStatus')) {
+            document.getElementById('editAccountStatus').value = "Đã kết nối";
+        }
         
         document.getElementById('editShopeePartnerId').value = "";
         document.getElementById('editShopeeShopId').value = "";
@@ -244,6 +265,9 @@ function openEditAccountModal(id = null) {
                 document.getElementById('editAccountName').value = acc.name || '';
                 document.getElementById('editAccountVideoFolder').value = acc.video_folder || '';
                 document.getElementById('editAccountPlatform').value = acc.platform || 'shopee';
+                if (document.getElementById('editAccountStatus')) {
+                    document.getElementById('editAccountStatus').value = acc.status || 'Đã kết nối';
+                }
                 document.getElementById('editAccountProxyServer').value = acc.proxy_server || '';
                 document.getElementById('editAccountProxyUser').value = acc.proxy_username || '';
                 document.getElementById('editAccountProxyPass').value = acc.proxy_password || '';
@@ -276,6 +300,8 @@ async function saveAccount() {
     const proxy_username = document.getElementById('editAccountProxyUser').value.trim();
     const proxy_password = document.getElementById('editAccountProxyPass').value.trim();
     const auth_mode = document.getElementById('editAccountAuthMode').value;
+    const statusEl = document.getElementById('editAccountStatus');
+    const status = statusEl ? statusEl.value : (auth_mode === 'api' ? 'Đã kết nối (API)' : 'Đã kết nối');
     
     if(!name) { showToast("Vui lòng nhập tên Shop!", "warning"); return; }
     
@@ -289,7 +315,7 @@ async function saveAccount() {
         proxy_server: proxy_server,
         proxy_username: proxy_username,
         proxy_password: proxy_password,
-        status: auth_mode === 'api' ? 'Đã kết nối (API)' : 'Chưa kết nối',
+        status: status,
         auth_mode: auth_mode,
         shopee_partner_id: document.getElementById('editShopeePartnerId').value.trim(),
         shopee_shop_id: document.getElementById('editShopeeShopId').value.trim(),
@@ -487,37 +513,408 @@ async function extractShopLinks() {
 
 
 // ==========================================
-// 5. MODULE AUTO BOOST 4H (ĐẨY SẢN PHẨM)
+// 5. MODULE AUTO BOOST (PIPELINE 4 NHÓM XOAY VÒNG CHUẨN GOSELLER)
 // ==========================================
 let boostProductsData = [];
 let selectedBoostProductNames = [];
+let currentBoostGroups = [
+    { id: "group_1", name: "Đẩy nhóm số 1", products: [] },
+    { id: "group_2", name: "Đẩy nhóm số 2", products: [] },
+    { id: "group_3", name: "Đẩy nhóm số 3", products: [] },
+    { id: "group_4", name: "Đẩy nhóm số 4", products: [] }
+];
+let activeModalGroupId = null;
+let modalTempSelectedProducts = [];
+let isBoostRunningLocally = false;
+let localBoostRemainingSec = 0;
+let localActiveGroupIndex = 0;
 
-function onBoostAccountChanged() {
-    boostProductsData = [];
-    selectedBoostProductNames = [];
-    renderBoostProductTable([]);
-    updateBoostSelectedCounter();
-}
-
-function toggleBoostMode() {
-    const mode = document.getElementById('boostMode').value;
-    const box = document.getElementById('boostProductSelectionBox');
-    if (mode === 'selected') {
-        box.style.display = 'block';
-        if (boostProductsData.length === 0) {
-            fetchBoostShopProducts();
-        }
+function switchBoostModeView(mode) {
+    const pView = document.getElementById('boostPipelineView');
+    const qView = document.getElementById('boostQuickView');
+    const btnP = document.getElementById('btnTabPipeline');
+    const btnQ = document.getElementById('btnTabQuick');
+    
+    if (mode === 'pipeline') {
+        if (pView) pView.style.display = 'block';
+        if (qView) qView.style.display = 'none';
+        if (btnP) { btnP.className = 'btn btn-primary btn-sm w-50'; }
+        if (btnQ) { btnQ.className = 'btn btn-outline btn-sm w-50'; }
     } else {
-        box.style.display = 'block'; // vẫn hiện để user có thể xem và đẩy tức thì 1 sản phẩm
+        if (pView) pView.style.display = 'none';
+        if (qView) qView.style.display = 'block';
+        if (btnP) { btnP.className = 'btn btn-outline btn-sm w-50'; }
+        if (btnQ) { btnQ.className = 'btn btn-primary btn-sm w-50'; }
+        if (boostProductsData.length === 0) fetchBoostShopProducts();
     }
 }
 
+async function onBoostAccountChanged() {
+    const accSelect = document.getElementById('boostAccountSelect');
+    if (!accSelect) return;
+    const shopName = accSelect.options[accSelect.selectedIndex]?.text || "Shop";
+    const shopNameEl = document.getElementById('boostPipelineShopName');
+    if (shopNameEl) shopNameEl.textContent = shopName.split('[')[0].trim();
+    
+    selectedBoostProductNames = [];
+    renderBoostProductTable([]);
+    await loadBoostGroupsFromServer();
+}
+
+async function loadBoostGroupsFromServer() {
+    const accountId = document.getElementById('boostAccountSelect')?.value;
+    if (!accountId) return;
+    try {
+        const res = await fetch(`/api/boost/groups?account_id=${encodeURIComponent(accountId)}`);
+        if (res.ok) {
+            const data = await res.json();
+            currentBoostGroups = data.groups && data.groups.length > 0 ? data.groups : [
+                { id: "group_1", name: "Đẩy nhóm số 1", products: [] },
+                { id: "group_2", name: "Đẩy nhóm số 2", products: [] },
+                { id: "group_3", name: "Đẩy nhóm số 3", products: [] },
+                { id: "group_4", name: "Đẩy nhóm số 4", products: [] }
+            ];
+            localActiveGroupIndex = data.current_group_index || 0;
+            renderBoostPipeline();
+        }
+    } catch(e) {
+        renderBoostPipeline();
+    }
+}
+
+function renderBoostPipeline() {
+    const container = document.getElementById('boostPipelineContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    currentBoostGroups.forEach((group, idx) => {
+        const isCurrentRunning = isBoostRunningLocally && idx === localActiveGroupIndex;
+        const card = document.createElement('div');
+        card.className = `boost-group-card ${isCurrentRunning ? 'active-running' : ''}`;
+        card.id = `boost_card_${group.id}`;
+        
+        // Header
+        const header = document.createElement('div');
+        header.className = 'boost-group-header';
+        header.innerHTML = `
+            <div class="boost-group-title">
+                <span class="group-idx-badge">${idx + 1}</span>
+                <span style="font-weight: 700;">${group.name || `Đẩy nhóm số ${idx + 1}`}</span>
+                ${isCurrentRunning ? '<span class="badge-status badge-active" style="font-size: 0.72rem; padding: 2px 8px; margin-left: 6px;"><span class="pulse-dot-green"></span> ĐANG ĐẨY</span>' : ''}
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-outline btn-sm" onclick="openGroupProductModal('${group.id}')" style="font-size: 0.8rem; padding: 4px 10px;">
+                    <i class="fa-solid fa-plus"></i> Chọn 5 SP (${(group.products || []).length}/5)
+                </button>
+                <button class="btn btn-outline btn-sm text-danger" onclick="deleteBoostGroup('${group.id}')" title="Xóa nhóm này" style="padding: 4px 8px;">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+        `;
+        card.appendChild(header);
+        
+        // Products Row (5 slots)
+        const prodsRow = document.createElement('div');
+        prodsRow.className = 'boost-products-row';
+        
+        const prods = group.products || [];
+        for (let s = 0; s < 5; s++) {
+            const slot = document.createElement('div');
+            if (s < prods.length && prods[s]) {
+                const p = prods[s];
+                slot.className = 'boost-product-slot filled-slot';
+                const imgSrc = p.image || '';
+                const fallbackImg = `<div style="width: 100%; height: 100%; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.05);"><i class="fa-solid fa-box text-muted"></i></div>`;
+                slot.innerHTML = `
+                    ${imgSrc ? `<img src="${imgSrc}">` : fallbackImg}
+                    <div class="slot-overlay">
+                        <div class="slot-pname" title="${p.name}">${p.name}</div>
+                        <button class="slot-remove-btn" onclick="removeProductFromGroup('${group.id}', ${s}); event.stopPropagation();" title="Bỏ sản phẩm">&times;</button>
+                    </div>
+                `;
+            } else {
+                slot.className = 'boost-product-slot empty-slot';
+                slot.innerHTML = `<i class="fa-solid fa-plus"></i><span>Slot #${s + 1}</span>`;
+                slot.onclick = () => openGroupProductModal(group.id);
+            }
+            prodsRow.appendChild(slot);
+        }
+        card.appendChild(prodsRow);
+        container.appendChild(card);
+        
+        // Connector
+        if (idx < currentBoostGroups.length - 1) {
+            const conn = document.createElement('div');
+            conn.className = 'pipeline-connector';
+            const isConnActive = isCurrentRunning;
+            conn.innerHTML = `
+                <div class="pipeline-connector-badge ${isConnActive ? 'active-badge' : ''}">
+                    ${isConnActive ? `<span class="pulse-dot-green"></span> Đang chạy (Chờ 4h)` : `⏳ Chờ 4 tiếng`}
+                </div>
+            `;
+            container.appendChild(conn);
+        }
+    });
+}
+
+function updateBoostPipelineActiveState(isRunning, activeIndex) {
+    const cards = document.querySelectorAll('.boost-group-card');
+    cards.forEach((card, idx) => {
+        if (isRunning && idx === activeIndex) {
+            card.classList.add('active-running');
+        } else {
+            card.classList.remove('active-running');
+        }
+    });
+
+    const connectors = document.querySelectorAll('.pipeline-connector-badge');
+    connectors.forEach((conn, idx) => {
+        if (isRunning && idx === activeIndex) {
+            conn.classList.add('active-badge');
+            conn.innerHTML = `<span class="pulse-dot-green"></span> Đang chạy (Chờ 4h)`;
+        } else {
+            conn.classList.remove('active-badge');
+            conn.innerHTML = `⏳ Chờ 4 tiếng`;
+        }
+    });
+}
+
+async function openGroupProductModal(groupId) {
+    activeModalGroupId = groupId;
+    const group = currentBoostGroups.find(g => g.id === groupId);
+    const titleEl = document.getElementById('groupModalTitle');
+    if (titleEl && group) {
+        titleEl.innerHTML = `<i class="fa-solid fa-boxes-stacked" style="color: #ec4899;"></i> Chọn 5 SP Cho ${group.name || 'Nhóm'}`;
+    }
+    
+    // Copy existing products to temp list
+    modalTempSelectedProducts = group && group.products ? [...group.products] : [];
+    updateGroupModalSelectedCount();
+    
+    openModal('boostGroupProductModal');
+    
+    if (boostProductsData.length === 0) {
+        await fetchBoostShopProducts();
+    }
+    renderGroupProductModalTable(boostProductsData);
+}
+
+function closeGroupProductModal() {
+    closeModal('boostGroupProductModal');
+    activeModalGroupId = null;
+}
+
+function renderGroupProductModalTable(products) {
+    const tbody = document.getElementById('groupProductModalTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    if (products.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 25px;">Chưa có dữ liệu sản phẩm. Vui lòng bấm 'Tải Danh Mục Sản Phẩm Shop'.</td></tr>`;
+        return;
+    }
+    
+    products.forEach((prod, idx) => {
+        const isChecked = modalTempSelectedProducts.some(p => p.name === prod.name);
+        const tr = document.createElement('tr');
+        const imgTag = prod.image ? `<img src="${prod.image}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);">` : `<div style="width: 44px; height: 44px; background: rgba(255,255,255,0.05); border-radius: 6px; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-image text-muted"></i></div>`;
+        
+        tr.innerHTML = `
+            <td style="text-align: center;">
+                <input type="checkbox" class="group-prod-cb" ${isChecked ? 'checked' : ''} onchange="toggleGroupProductSelect(${idx}, this.checked)">
+            </td>
+            <td>${imgTag}</td>
+            <td>
+                <div style="font-weight: 600; font-size: 0.88rem; line-height: 1.3;">${prod.name}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">ID: ${prod.id || (idx+1)}</div>
+            </td>
+            <td>
+                <div style="color: #10b981; font-weight: 600; font-size: 0.85rem;">${prod.price || 'Sẵn sàng'}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">Kho: ${prod.stock || 'Còn hàng'}</div>
+            </td>
+            <td>
+                <span class="badge-status" style="background: rgba(100,116,139,0.2); color: #94a3b8; font-size: 0.75rem;">Có thể đẩy</span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function filterGroupProductModalList() {
+    const q = (document.getElementById('groupProductModalSearch')?.value || '').toLowerCase().trim();
+    if (!q) {
+        renderGroupProductModalTable(boostProductsData);
+        return;
+    }
+    const filtered = boostProductsData.filter(p => (p.name || '').toLowerCase().includes(q));
+    renderGroupProductModalTable(filtered);
+}
+
+function toggleGroupProductSelect(productIndex, isChecked) {
+    const prod = boostProductsData[productIndex];
+    if (!prod) return;
+    
+    if (isChecked) {
+        if (modalTempSelectedProducts.length >= 5) {
+            showToast("Mỗi nhóm chỉ được chọn tối đa 5 sản phẩm!", "warning");
+            renderGroupProductModalTable(boostProductsData);
+            return;
+        }
+        if (!modalTempSelectedProducts.some(p => p.name === prod.name)) {
+            modalTempSelectedProducts.push({
+                id: prod.id || `p_${Date.now()}`,
+                name: prod.name,
+                image: prod.image || '',
+                price: prod.price || '',
+                stock: prod.stock || ''
+            });
+        }
+    } else {
+        modalTempSelectedProducts = modalTempSelectedProducts.filter(p => p.name !== prod.name);
+    }
+    updateGroupModalSelectedCount();
+}
+
+function updateGroupModalSelectedCount() {
+    const countEl = document.getElementById('groupModalSelectedCount');
+    if (countEl) countEl.textContent = modalTempSelectedProducts.length;
+}
+
+function confirmGroupProductSelection() {
+    if (!activeModalGroupId) return;
+    const group = currentBoostGroups.find(g => g.id === activeModalGroupId);
+    if (group) {
+        group.products = [...modalTempSelectedProducts];
+        showToast(`Đã cập nhật ${group.products.length} sản phẩm cho ${group.name}!`, "success");
+        renderBoostPipeline();
+        saveBoostGroupsToServer();
+    }
+    closeGroupProductModal();
+}
+
+function removeProductFromGroup(groupId, productIndex) {
+    const group = currentBoostGroups.find(g => g.id === groupId);
+    if (group && group.products) {
+        group.products.splice(productIndex, 1);
+        renderBoostPipeline();
+        saveBoostGroupsToServer();
+    }
+}
+
+function addNewBoostGroup() {
+    const newIdx = currentBoostGroups.length + 1;
+    currentBoostGroups.push({
+        id: `group_${Date.now()}`,
+        name: `Đẩy nhóm số ${newIdx}`,
+        products: []
+    });
+    renderBoostPipeline();
+    showToast(`Đã thêm Nhóm số ${newIdx}!`, "info");
+    saveBoostGroupsToServer();
+}
+
+function deleteBoostGroup(groupId) {
+    if (currentBoostGroups.length <= 1) {
+        showToast("Cần giữ ít nhất 1 nhóm đẩy!", "warning");
+        return;
+    }
+    currentBoostGroups = currentBoostGroups.filter(g => g.id !== groupId);
+    currentBoostGroups.forEach((g, i) => {
+        g.name = `Đẩy nhóm số ${i + 1}`;
+    });
+    renderBoostPipeline();
+    saveBoostGroupsToServer();
+    showToast("Đã xóa nhóm đẩy.", "info");
+}
+
+function clearAllBoostGroups() {
+    currentBoostGroups = [
+        { id: "group_1", name: "Đẩy nhóm số 1", products: [] },
+        { id: "group_2", name: "Đẩy nhóm số 2", products: [] },
+        { id: "group_3", name: "Đẩy nhóm số 3", products: [] },
+        { id: "group_4", name: "Đẩy nhóm số 4", products: [] }
+    ];
+    renderBoostPipeline();
+    saveBoostGroupsToServer();
+    showToast("Đã thiết lập lại 4 nhóm mặc định.", "info");
+}
+
+async function saveBoostGroupsToServer() {
+    const accountId = document.getElementById('boostAccountSelect')?.value;
+    if (!accountId) return;
+    try {
+        const res = await fetch("/api/boost/groups/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                account_id: accountId,
+                groups: currentBoostGroups
+            })
+        });
+        if (res.ok) {
+            showToast("Đã lưu cấu hình các nhóm đẩy!", "success");
+        }
+    } catch(e) {}
+}
+
+async function startBoostPipeline() {
+    const accountId = document.getElementById('boostAccountSelect')?.value;
+    if (!accountId) { showToast("Vui lòng chọn Shop!", "warning"); return; }
+    
+    const totalProds = currentBoostGroups.reduce((sum, g) => sum + (g.products?.length || 0), 0);
+    if (totalProds === 0) {
+        showToast("Vui lòng chọn sản phẩm cho ít nhất 1 nhóm trước khi bắt đầu!", "warning");
+        return;
+    }
+    
+    try {
+        const res = await fetch("/api/boost/groups/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                account_id: accountId,
+                start_group_index: 0
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast("Đã kích hoạt tự động đẩy xoay vòng 4 nhóm 24/7!", "success");
+            updateBoostUI(true, 4 * 3600);
+        } else {
+            showToast(data.detail || "Lỗi kích hoạt tiến trình!", "error");
+        }
+    } catch(e) {
+        showToast("Lỗi kết nối server!", "error");
+    }
+}
+
+async function stopBoostPipeline() {
+    const accountId = document.getElementById('boostAccountSelect')?.value;
+    try {
+        await fetch(`/api/boost/groups/stop?account_id=${encodeURIComponent(accountId)}`, { method: "POST" });
+        showToast("Đã dừng tự động đẩy nhóm.", "info");
+        updateBoostUI(false, 0);
+    } catch(e) {}
+}
+
 async function fetchBoostShopProducts() {
-    const accountId = document.getElementById('boostAccountSelect').value;
+    const accountId = document.getElementById('boostAccountSelect')?.value;
     if (!accountId) { showToast("Vui lòng chọn Shop Shopee!", "warning"); return; }
     
     const tbody = document.getElementById('boostProductTableBody');
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 25px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i><div class="mt-2">Đang kết nối Kênh Người Bán để quét sản phẩm...</div></td></tr>`;
+    const btn = document.getElementById('btnScanBoost');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang kết nối Shop...`;
+    }
+
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px;">
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+            <div class="mt-3" style="font-weight: 600; font-size: 1rem;">Đang kết nối Kênh Người Bán để quét sản phẩm...</div>
+            <div class="text-muted" style="font-size: 0.85rem; margin-top: 6px;">Playwright đang kết nối Shopee Seller Center (khoảng 5-10 giây)...</div>
+        </td></tr>`;
+    }
     
     showToast("Đang quét danh sách sản phẩm từ Shop Shopee...", "info");
     
@@ -528,7 +925,7 @@ async function fetchBoostShopProducts() {
         boostProductsData = Array.isArray(data) ? data : [];
         
         if (boostProductsData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 25px;">Không tìm thấy sản phẩm nào hoặc Shop chưa có sản phẩm.</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 25px;">Không tìm thấy sản phẩm nào hoặc Shop chưa có sản phẩm.</td></tr>`;
             showToast("Không tìm thấy sản phẩm trong Shop!", "warning");
             return;
         }
@@ -536,8 +933,13 @@ async function fetchBoostShopProducts() {
         showToast(`Đã tải thành công ${boostProductsData.length} sản phẩm!`, "success");
         renderBoostProductTable(boostProductsData);
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 25px;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi tải danh sách sản phẩm từ Shop.</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 25px;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi tải danh sách sản phẩm từ Shop. Vui lòng bấm Quản lý Shop -> Login trước.</td></tr>`;
         showToast("Lỗi kết nối hoặc Shop chưa đăng nhập!", "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> Tải Danh Mục Sản Phẩm Shop`;
+        }
     }
 }
 
@@ -584,7 +986,7 @@ function renderBoostProductTable(products) {
 }
 
 function filterBoostProductList() {
-    const query = (document.getElementById('boostProductSearchInput').value || '').toLowerCase().trim();
+    const query = (document.getElementById('boostProductSearchInput')?.value || '').toLowerCase().trim();
     if (!query) {
         renderBoostProductTable(boostProductsData);
         return;
@@ -622,7 +1024,7 @@ function updateBoostSelectedCounter() {
 }
 
 async function instantBoostSingle(encodedName) {
-    const accountId = document.getElementById('boostAccountSelect').value;
+    const accountId = document.getElementById('boostAccountSelect')?.value;
     const name = decodeURIComponent(encodedName);
     if (!accountId) { showToast("Vui lòng chọn Shop!", "warning"); return; }
     
@@ -642,18 +1044,10 @@ async function instantBoostSingle(encodedName) {
     } catch (e) { showToast("Lỗi kết nối khi đẩy sản phẩm!", "error"); }
 }
 
-async function startAutoBoost() {
-    const accountId = document.getElementById('boostAccountSelect').value;
-    const mode = document.getElementById('boostMode').value;
+async function startQuickBoost() {
+    const accountId = document.getElementById('boostAccountSelect')?.value;
     if (!accountId) { showToast("Vui lòng chọn Shop Shopee!", "warning"); return; }
-    
-    const payload = {
-        account_id: accountId,
-        mode: mode,
-        product_ids: mode === 'selected' ? selectedBoostProductNames : null
-    };
-    
-    if (mode === 'selected' && selectedBoostProductNames.length === 0) {
+    if (selectedBoostProductNames.length === 0) {
         showToast("Vui lòng tích chọn ít nhất 1 sản phẩm bên dưới để đẩy!", "warning");
         return;
     }
@@ -662,11 +1056,15 @@ async function startAutoBoost() {
         const res = await fetch("/api/boost/start", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                account_id: accountId,
+                mode: "selected",
+                product_ids: selectedBoostProductNames
+            })
         });
         const data = await res.json();
         if (res.ok) {
-            showToast("Đã kích hoạt tự động đẩy sản phẩm 4h!", "success");
+            showToast("Đã kích hoạt tự động đẩy 5 sản phẩm đã chọn!", "success");
             updateBoostUI(true, 4 * 3600);
         } else {
             showToast(data.detail || "Lỗi bật đẩy sản phẩm", "error");
@@ -704,28 +1102,6 @@ async function stopAutoBoost() {
     } catch(e) {}
 }
 
-function updateBoostUI(isRunning, remainingSec) {
-    const badge = document.getElementById('boostStatusBadge');
-    const timer = document.getElementById('boostCountdown');
-    if (!badge || !timer) return;
-    
-    if (isRunning) {
-        badge.className = "badge-status badge-active";
-        badge.textContent = "Đang chạy 24/7";
-        if (remainingSec > 0) {
-            const h = Math.floor(remainingSec / 3600).toString().padStart(2, '0');
-            const m = Math.floor((remainingSec % 3600) / 60).toString().padStart(2, '0');
-            const s = (remainingSec % 60).toString().padStart(2, '0');
-            timer.textContent = `${h}:${m}:${s}`;
-        } else {
-            timer.textContent = "Đang đẩy...";
-        }
-    } else {
-        badge.className = "badge-status badge-inactive";
-        badge.textContent = "Đang dừng";
-        timer.textContent = "--:--:--";
-    }
-}
 
 
 // ==========================================
@@ -768,7 +1144,17 @@ async function fetchFlashSaleShopProducts() {
     }
 
     const tbody = document.getElementById('fsProductTableBody');
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 25px;"><i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; color: #f59e0b;"></i><div class="mt-2">Đang kết nối Kênh Người Bán để quét sản phẩm cho Flash Sale...</div></td></tr>`;
+    const btn = document.getElementById('btnScanFlashSale');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang kết nối Shop...`;
+    }
+
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 30px;">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: #f59e0b;"></i>
+        <div class="mt-3" style="font-weight: 600; font-size: 1rem;">Đang kết nối Kênh Người Bán để quét sản phẩm cho Flash Sale...</div>
+        <div class="text-muted" style="font-size: 0.85rem; margin-top: 6px;">Playwright đang quét danh mục sản phẩm (khoảng 5-10 giây)...</div>
+    </td></tr>`;
     
     showToast("Đang quét danh sách sản phẩm của Shop...", "info");
     
@@ -788,8 +1174,13 @@ async function fetchFlashSaleShopProducts() {
         showToast(`Đã tải thành công ${flashsaleProductsData.length} sản phẩm!`, "success");
         renderFlashSaleProductTable(flashsaleProductsData);
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 25px;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi tải danh sách sản phẩm.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 25px;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi tải danh sách sản phẩm. Vui lòng bấm Quản lý Shop -> Login trước.</td></tr>`;
         showToast("Lỗi kết nối hoặc Shop chưa đăng nhập!", "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i> Quét / Tải Sản Phẩm Shop`;
+        }
     }
 }
 
@@ -1224,27 +1615,221 @@ async function processImageFraming() {
 // 11. POLLING SYSTEM STATUS & REALTIME CHAT
 // ==========================================
 let chatPollCounter = 0;
+let localBoostRemainingSec = 0;
+let isBoostRunningLocally = false;
+
+function updateBoostUI(isRunning, remainingSec, runningCount = 0, runningAccounts = [], activeGroupIndex = 0, activeGroupName = "") {
+    isBoostRunningLocally = isRunning;
+    if (remainingSec > 0) localBoostRemainingSec = remainingSec;
+    if (typeof activeGroupIndex === 'number') localActiveGroupIndex = activeGroupIndex;
+    
+    const badge = document.getElementById('boostStatusBadge');
+    const timerWrapper = document.getElementById('boostCountdownWrapper');
+    const timer = document.getElementById('boostCountdown');
+    const navDot = document.getElementById('navDotBoost');
+    const liveInfoBox = document.getElementById('boostLiveInfoBox');
+    const liveDetail = document.getElementById('boostLiveDetail');
+    const activeNameEl = document.getElementById('boostGroupActiveName');
+    
+    if (isRunning) {
+        if (badge) {
+            badge.className = "badge-status badge-active";
+            badge.innerHTML = `<span class="pulse-dot-green"></span> Đang Hoạt Động (${runningCount > 1 ? `${runningCount} Shop` : 'Tự Động 4h'})`;
+        }
+        if (timerWrapper) timerWrapper.style.display = "inline-flex";
+        if (navDot) navDot.style.display = "inline-block";
+        if (liveInfoBox) liveInfoBox.style.display = "block";
+        
+        const gName = activeGroupName || (currentBoostGroups[localActiveGroupIndex]?.name || `Nhóm ${localActiveGroupIndex + 1}`);
+        if (activeNameEl) activeNameEl.textContent = gName;
+        if (liveDetail) {
+            liveDetail.textContent = `Đang đẩy ${gName}, đếm ngược 4 tiếng để tự động đổi nhóm tiếp theo...`;
+        }
+        
+        if (timer) {
+            if (localBoostRemainingSec > 0) {
+                const h = Math.floor(localBoostRemainingSec / 3600).toString().padStart(2, '0');
+                const m = Math.floor((localBoostRemainingSec % 3600) / 60).toString().padStart(2, '0');
+                const s = (localBoostRemainingSec % 60).toString().padStart(2, '0');
+                timer.textContent = `${h}:${m}:${s}`;
+            } else {
+                timer.textContent = "Đang đẩy...";
+            }
+        }
+    } else {
+        if (badge) {
+            badge.className = "badge-status badge-inactive";
+            badge.textContent = "⚪ Đang dừng";
+        }
+        if (timerWrapper) timerWrapper.style.display = "none";
+        if (navDot) navDot.style.display = "none";
+        if (liveInfoBox) liveInfoBox.style.display = "none";
+        if (timer) timer.textContent = "--:--:--";
+    }
+    
+    updateBoostPipelineActiveState(isRunning, localActiveGroupIndex);
+}
+
+function updateFlashSaleUI(isRunning, currentShopName = "", statusMessage = "") {
+    const badge = document.getElementById('flashsaleStatusBadge');
+    const navDot = document.getElementById('navDotFlashSale');
+    const liveInfoBox = document.getElementById('flashsaleLiveInfoBox');
+    const liveDetail = document.getElementById('flashsaleLiveDetail');
+    
+    if (isRunning) {
+        if (badge) {
+            badge.className = "badge-status badge-active";
+            badge.innerHTML = `<span class="pulse-dot-amber"></span> Đang tạo Flash Sale`;
+        }
+        if (navDot) navDot.style.display = "inline-block";
+        if (liveInfoBox) liveInfoBox.style.display = "block";
+        if (liveDetail) {
+            liveDetail.textContent = statusMessage || (currentShopName ? `Đang tạo chiến dịch Flash Sale cho Shop ${currentShopName}...` : 'Đang thực thi...');
+        }
+    } else {
+        if (badge) {
+            badge.className = "badge-status badge-inactive";
+            badge.textContent = "⚪ Sẵn sàng";
+        }
+        if (navDot) navDot.style.display = "none";
+        if (liveInfoBox) liveInfoBox.style.display = "none";
+    }
+}
+
+function updatePosterUI(isRunning, totalVideos = 0, completedVideos = 0, currentVideo = "") {
+    const badge = document.getElementById('posterStatusBadge');
+    const progressBadge = document.getElementById('posterProgressBadge');
+    const progressText = document.getElementById('posterProgressText');
+    const navDot = document.getElementById('navDotPoster');
+    const liveInfoBox = document.getElementById('posterLiveInfoBox');
+    const liveDetail = document.getElementById('posterLiveDetail');
+    
+    if (isRunning) {
+        if (badge) {
+            badge.className = "badge-status badge-active";
+            badge.innerHTML = `<span class="pulse-dot-green"></span> Đang đăng video`;
+        }
+        if (navDot) navDot.style.display = "inline-block";
+        if (progressBadge) progressBadge.style.display = "inline-flex";
+        if (progressText) progressText.textContent = `${completedVideos}/${totalVideos} video`;
+        if (liveInfoBox) liveInfoBox.style.display = "block";
+        if (liveDetail) {
+            liveDetail.textContent = currentVideo ? `Đang đăng file: ${currentVideo} (${completedVideos}/${totalVideos})` : `Đang tiến hành đăng video...`;
+        }
+    } else {
+        if (badge) {
+            badge.className = "badge-status badge-inactive";
+            badge.textContent = "⚪ Sẵn sàng";
+        }
+        if (navDot) navDot.style.display = "none";
+        if (progressBadge) progressBadge.style.display = "none";
+        if (liveInfoBox) liveInfoBox.style.display = "none";
+    }
+}
+
+function updateChatUI(isRunning, runningCount = 0) {
+    const chatBadge = document.getElementById('chatStatusBadge');
+    const navDot = document.getElementById('navDotChat');
+    
+    if (isRunning) {
+        if (chatBadge) {
+            chatBadge.className = "badge-status badge-active";
+            chatBadge.innerHTML = `<span class="pulse-dot-green"></span> Đang trực 24/7 (${runningCount > 1 ? `${runningCount} Shop` : 'Online'})`;
+        }
+        if (navDot) navDot.style.display = "inline-block";
+    } else {
+        if (chatBadge) {
+            chatBadge.className = "badge-status badge-inactive";
+            chatBadge.textContent = "⚪ Chưa bật";
+        }
+        if (navDot) navDot.style.display = "none";
+    }
+}
+
+function updateGlobalHeaderBadge(runningList) {
+    const globalBadge = document.getElementById('globalActivityBadge');
+    const globalDot = document.getElementById('globalActivityDot');
+    const globalText = document.getElementById('globalActivityText');
+    if (!globalBadge || !globalDot || !globalText) return;
+    
+    if (runningList && runningList.length > 0) {
+        globalBadge.className = "global-activity-badge";
+        globalDot.className = "pulse-dot-green";
+        globalText.textContent = `⚡ Đang chạy: ${runningList.join(', ')}`;
+    } else {
+        globalBadge.className = "global-activity-badge idle";
+        globalDot.className = "pulse-dot-gray";
+        globalText.textContent = "⚪ Hệ thống sẵn sàng";
+    }
+}
+
 function startStatusPolling() {
-    setInterval(async () => {
+    // 1. Đồng hồ đếm ngược từng giây độc lập trên client
+    setInterval(() => {
+        if (isBoostRunningLocally && localBoostRemainingSec > 0) {
+            localBoostRemainingSec--;
+            const timer = document.getElementById('boostCountdown');
+            if (timer) {
+                const h = Math.floor(localBoostRemainingSec / 3600).toString().padStart(2, '0');
+                const m = Math.floor((localBoostRemainingSec % 3600) / 60).toString().padStart(2, '0');
+                const s = (localBoostRemainingSec % 60).toString().padStart(2, '0');
+                timer.textContent = `${h}:${m}:${s}`;
+            }
+        }
+    }, 1000);
+
+    // 2. Định kỳ 2.5s truy vấn trạng thái thực tế từ Backend
+    const pollAllStatuses = async () => {
         try {
-            // Check boost status
-            const resBoost = await fetch("/api/boost/status");
-            const dataBoost = await resBoost.json();
-            updateBoostUI(dataBoost.is_running, dataBoost.remaining_seconds);
+            const [boostRes, fsRes, upRes, chatRes] = await Promise.allSettled([
+                fetch("/api/boost/status").then(r => r.json()),
+                fetch("/api/flashsale/status").then(r => r.json()),
+                fetch("/api/uploader/status").then(r => r.json()),
+                fetch("/api/chat/status").then(r => r.json())
+            ]);
             
-            // Check chat status
-            const resChat = await fetch("/api/chat/status");
-            const dataChat = await resChat.json();
-            const chatBadge = document.getElementById('chatStatusBadge');
-            if (chatBadge) {
-                chatBadge.className = dataChat.is_running ? "badge-status badge-active" : "badge-status badge-inactive";
-                chatBadge.textContent = dataChat.is_running ? "Đang lắng nghe 24/7" : "Chưa bật";
+            const runningTasks = [];
+            
+            // Auto Boost
+            if (boostRes.status === "fulfilled" && boostRes.value) {
+                const b = boostRes.value;
+                updateBoostUI(b.is_running, b.remaining_seconds, b.running_count, b.running_accounts, b.active_group_index, b.active_group_name);
+                if (b.is_running) runningTasks.push(`Auto Boost 4h${b.running_count > 1 ? ` (${b.running_count} Shop)` : ''}`);
             }
             
+            // Auto Flash Sale
+            if (fsRes.status === "fulfilled" && fsRes.value) {
+                const fs = fsRes.value;
+                updateFlashSaleUI(fs.is_running, fs.current_shop_name, fs.status_message);
+                if (fs.is_running) runningTasks.push(`Flash Sale${fs.current_shop_name ? ` (${fs.current_shop_name})` : ''}`);
+            }
+            
+            // Video Poster
+            if (upRes.status === "fulfilled" && upRes.value) {
+                const up = upRes.value;
+                updatePosterUI(up.is_running, up.total_videos, up.completed_videos, up.current_video);
+                if (up.is_running) runningTasks.push("Đăng Video");
+            }
+            
+            // AI Chatbot
+            if (chatRes.status === "fulfilled" && chatRes.value) {
+                const ch = chatRes.value;
+                updateChatUI(ch.is_running, ch.running_count);
+                if (ch.is_running) runningTasks.push("AI Chatbot");
+            }
+            
+            // Cập nhật Header Badge
+            updateGlobalHeaderBadge(runningTasks);
+            
+            // Cập nhật Chat History
             chatPollCounter++;
             if (chatPollCounter % 3 === 0) {
                 loadChatHistory();
             }
         } catch(e) {}
-    }, 1000);
+    };
+
+    // Chạy ngay lần đầu và đặt interval 2.5s
+    pollAllStatuses();
+    setInterval(pollAllStatuses, 2500);
 }

@@ -156,15 +156,22 @@ class ShopeeProductBooster:
                 else:
                     img_url = f"https://down-vn.img.susercontent.com/file/{image_id}"
 
-            price_val = it.get("price") or it.get("min_price") or it.get("current_price") or "0"
+            # Format price
+            price_detail = it.get("price_detail", {})
+            price_val = price_detail.get("selling_price_min") or price_detail.get("price_min") or it.get("price") or it.get("min_price") or it.get("current_price") or "0"
             try:
                 price_float = float(price_val)
                 price_str = f"{price_float:,.0f} đ" if price_float > 0 else "Sẵn sàng"
             except Exception:
                 price_str = str(price_val)
 
-            stock_val = it.get("stock") or it.get("total_stock") or it.get("normal_stock") or "Còn hàng"
-            boost_end = it.get("boost_cool_down_seconds", 0) or it.get("boost_cooldown", 0)
+            # Format stock
+            stock_detail = it.get("stock_detail", {})
+            stock_val = stock_detail.get("total_available_stock") or stock_detail.get("total_seller_stock") or it.get("stock") or it.get("total_stock") or "Còn hàng"
+
+            # Check boost info
+            boost_info = it.get("boost_info", {})
+            boost_end = boost_info.get("cool_down_seconds", 0) or boost_info.get("boost_cooldown", 0) or it.get("boost_cool_down_seconds", 0)
             is_boosted = boost_end > 0
 
             return {
@@ -181,66 +188,94 @@ class ShopeeProductBooster:
             await self.init_browser(headless=True)
             self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
 
+            captured_base_url = []
+            total_shop_products = [0]
+
             # Lắng nghe request/response API của Shopee để bắt danh sách sản phẩm chuẩn JSON
             async def handle_response(response):
                 try:
                     url = response.url
-                    if any(api in url for api in ["get_product_list", "search_product_list", "get_boost_info"]):
+                    if any(api in url for api in ["get_product_list", "search_product_list"]):
                         if response.status == 200:
                             data = await response.json()
                             items = (
                                 data.get("data", {}).get("products", []) or 
                                 data.get("data", {}).get("list", []) or 
                                 data.get("data", {}).get("mpsku_list", []) or 
-                                data.get("products", []) or 
                                 []
                             )
-                            for it in items:
-                                p_obj = format_product_item(it)
-                                if p_obj:
-                                    captured_api_products.append(p_obj)
+                            if items:
+                                if "SPC_CDS" in url and not captured_base_url:
+                                    captured_base_url.append(url)
+                                total_val = data.get("data", {}).get("page_info", {}).get("total") or data.get("data", {}).get("total", len(items))
+                                if total_val > total_shop_products[0]:
+                                    total_shop_products[0] = total_val
+                                for it in items:
+                                    p_obj = format_product_item(it)
+                                    if p_obj:
+                                        captured_api_products.append(p_obj)
                 except Exception:
                     pass
 
             self.page.on("response", handle_response)
 
             if log_callback:
-                await log_callback("🔍 Đang kết nối Kênh Người Bán Shopee để lấy danh mục sản phẩm...")
+                await log_callback("🔍 Đang kết nối Kênh Người Bán Shopee để lấy danh mục toàn bộ sản phẩm...")
             
             await self.page.goto("https://banhang.shopee.vn/portal/product/list/all", wait_until="domcontentloaded", timeout=40000)
-            await asyncio.sleep(4)
+            
+            # Chờ tối đa 5s để bắt trang đầu tiên
+            for _ in range(10):
+                if len(captured_api_products) > 0:
+                    break
+                await asyncio.sleep(0.5)
 
             # Kiểm tra đăng nhập
             if "login" in self.page.url.lower():
                 if log_callback:
-                    await log_callback("⚠️ Tài khoản chưa đăng nhập vào Kênh Người Bán Shopee. Vui lòng nhấn 'Quản lý Shop' -> 'Đăng nhập' để xác thực.")
+                    await log_callback("⚠️ Tài khoản chưa đăng nhập vào Kênh Người Bán Shopee. Vui lòng nhấn 'Quản lý Shop' -> 'Login' để đăng nhập.")
                 return []
 
-            # Thử gọi trực tiếp API Shopee qua JS evaluate (nếu bắt network chưa đủ)
-            if not captured_api_products:
-                try:
-                    js_data = await self.page.evaluate("""
-                        async () => {
-                            try {
-                                const res = await fetch('/api/v3/opt/mpsku/list/v2/get_product_list?page_number=1&page_size=48&list_type=all&need_ads=true', {credentials: 'include'});
-                                if (res.ok) {
-                                    return await res.json();
-                                }
-                            } catch(e) {}
-                            return null;
-                        }
-                    """)
-                    if js_data and js_data.get("data", {}).get("products"):
-                        for it in js_data["data"]["products"]:
-                            p_obj = format_product_item(it)
-                            if p_obj:
-                                captured_api_products.append(p_obj)
-                except Exception:
-                    pass
+            # Tự động quét các trang tiếp theo để lấy 100% toàn bộ sản phẩm của Shop
+            if captured_base_url and total_shop_products[0] > len(captured_api_products):
+                base_url = captured_base_url[0]
+                total = total_shop_products[0]
+                if log_callback:
+                    await log_callback(f"📦 Shop có tổng cộng {total} sản phẩm. Đang tải trọn bộ tất cả các trang...")
+                
+                page_num = 2
+                max_pages = 20
+                while len(captured_api_products) < total and page_num <= max_pages:
+                    if "page_number=" in base_url:
+                        next_url = base_url.replace("page_number=1", f"page_number={page_num}")
+                    else:
+                        next_url = base_url + f"&page_number={page_num}"
+                    
+                    try:
+                        js_res = await self.page.evaluate(f"""
+                            async () => {{
+                                try {{
+                                    const res = await fetch('{next_url}', {{credentials: 'include'}});
+                                    if (res.ok) return await res.json();
+                                }} catch(e) {{}}
+                                return null;
+                            }}
+                        """)
+                        if js_res and (js_res.get("data", {}).get("products") or js_res.get("data", {}).get("list")):
+                            next_items = js_res.get("data", {}).get("products") or js_res.get("data", {}).get("list") or []
+                            for it in next_items:
+                                p_obj = format_product_item(it)
+                                if p_obj:
+                                    captured_api_products.append(p_obj)
+                            page_num += 1
+                        else:
+                            break
+                    except Exception:
+                        break
 
             if captured_api_products:
                 if log_callback:
-                    await log_callback(f"✅ Đã tải thành công {len(captured_api_products)} sản phẩm chuẩn xác từ Shopee!")
+                    await log_callback(f"✅ Đã tải thành công toàn bộ {len(captured_api_products)} sản phẩm từ Shop Shopee!")
                 return captured_api_products
 
             # Fallback DOM Parsing chính xác cao

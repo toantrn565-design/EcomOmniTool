@@ -3,18 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ecom OmniTool - Professional Suite</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>Ecom OmniTool Pro - Enterprise Multi-Channel E-Commerce Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=20260926_065500">
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <i class="fa-solid fa-layer-group logo-icon"></i>
-                <span class="logo-text">OmniTool Pro</span>
+                <div class="logo-wrapper">
+                    <i class="fa-solid fa-layer-group logo-icon"></i>
+                    <div class="logo-text-group">
+                        <span class="logo-text">OmniTool Pro</span>
+                        <span class="logo-badge">⚡ ENTERPRISE AI</span>
+                    </div>
+                </div>
             </div>
             
             <nav class="sidebar-nav">
@@ -22,6 +29,7 @@
                 <a href="#" class="nav-item active" data-target="video-poster">
                     <i class="fa-solid fa-video"></i>
                     <span>Auto Video Poster</span>
+                    <span id="navDotPoster" class="nav-pulse-dot" style="display:none;" title="Đang chạy đăng video"></span>
                 </a>
                 <a href="#" class="nav-item" data-target="product-copier">
                     <i class="fa-solid fa-copy"></i>
@@ -30,10 +38,12 @@
                 <a href="#" class="nav-item" data-target="auto-boost">
                     <i class="fa-solid fa-rocket"></i>
                     <span>Auto Boost 4h</span>
+                    <span id="navDotBoost" class="nav-pulse-dot" style="display:none;" title="Đang tự động đẩy 4h"></span>
                 </a>
                 <a href="#" class="nav-item" data-target="auto-flashsale">
                     <i class="fa-solid fa-bolt"></i>
                     <span>Auto Flash Sale</span>
+                    <span id="navDotFlashSale" class="nav-pulse-dot" style="display:none;" title="Đang quét Flash Sale"></span>
                 </a>
                 <a href="#" class="nav-item" data-target="cron-scheduler-tab">
                     <i class="fa-solid fa-clock"></i>
@@ -44,6 +54,7 @@
                 <a href="#" class="nav-item" data-target="ai-chat-consultant">
                     <i class="fa-solid fa-headset"></i>
                     <span>AI Sales Chatbot</span>
+                    <span id="navDotChat" class="nav-pulse-dot" style="display:none;" title="AI Chatbot đang trực 24/7"></span>
                 </a>
                 <a href="#" class="nav-item" data-target="ai-rewriter">
                     <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -56,6 +67,10 @@
             </nav>
             
             <div class="sidebar-footer">
+                <div class="system-status-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>System Online</span>
+                </div>
                 <button id="themeToggle" class="btn-icon" title="Chế độ Sáng/Tối">
                     <i class="fa-solid fa-moon"></i>
                 </button>
@@ -65,13 +80,19 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <header class="top-header">
-                <h1 id="pageTitle">Auto Video Poster</h1>
+                <div class="header-left" style="display: flex; align-items: center; gap: 15px;">
+                    <h1 id="pageTitle">Auto Video Poster</h1>
+                    <div id="globalActivityBadge" class="global-activity-badge idle">
+                        <span id="globalActivityDot" class="pulse-dot-gray"></span>
+                        <span id="globalActivityText">Hệ thống sẵn sàng</span>
+                    </div>
+                </div>
                 <div class="header-actions">
                     <button class="btn btn-outline" onclick="openAccountsModal()">
-                        <i class="fa-solid fa-user-circle"></i> Quản lý Shop
+                        <i class="fa-solid fa-store" style="color: var(--accent-cyan);"></i> Quản lý Shop
                     </button>
                     <button class="btn btn-outline" onclick="openSettingsModal()">
-                        <i class="fa-solid fa-cog"></i> Cài đặt
+                        <i class="fa-solid fa-sliders" style="color: var(--primary-light);"></i> Cài đặt
                     </button>
                 </div>
             </header>
@@ -80,8 +101,29 @@
                 <!-- MODULE 1: VIDEO POSTER -->
                 <section id="video-poster" class="module-section active">
                     <div class="card">
-                        <h3><i class="fa-solid fa-upload"></i> Đăng Video Tiếp Thị Tự Động (Affiliate & Seller)</h3>
-                        <div class="form-group">
+                        <div class="flex-between align-center">
+                            <div>
+                                <h3><i class="fa-solid fa-upload"></i> Đăng Video Tiếp Thị Tự Động (Affiliate & Seller)</h3>
+                                <p class="text-muted">Tự động upload và gắn thẻ sản phẩm lên Shopee Video / TikTok Shop.</p>
+                            </div>
+                            <div class="status-panel-compact" style="display: flex; align-items: center; gap: 10px;">
+                                <span id="posterStatusBadge" class="badge-status badge-inactive">⚪ Sẵn sàng</span>
+                                <span id="posterProgressBadge" class="countdown-badge" style="display: none;"><i class="fa-solid fa-film"></i> <span id="posterProgressText">0/0 video</span></span>
+                            </div>
+                        </div>
+
+                        <!-- Live Poster Alert Box -->
+                        <div id="posterLiveInfoBox" class="live-status-card mt-3" style="display: none;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="font-weight: 700; color: #10b981; font-size: 0.95rem;"><i class="fa-solid fa-spinner fa-spin"></i> TIẾN TRÌNH ĐĂNG VIDEO ĐANG CHẠY</div>
+                                    <div id="posterLiveDetail" class="text-muted" style="font-size: 0.85rem; margin-top: 3px;">Đang chuẩn bị đăng video...</div>
+                                </div>
+                                <button class="btn btn-sm btn-danger" onclick="stopVideoUpload()"><i class="fa-solid fa-stop"></i> Dừng Đăng</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group mt-3">
                             <label>Chọn Shop để tải danh sách Video:</label>
                             <select id="videoAccountSelect" class="form-control" onchange="onVideoAccountChange()"></select>
                             
@@ -179,39 +221,82 @@
                     </div>
                 </section>
 
-                <!-- MODULE 3: AUTO BOOST 4H -->
+                <!-- MODULE 3: AUTO BOOST (PIPELINE 4 NHÓM XOAY VÒNG CHUẨN GOSELLER) -->
                 <section id="auto-boost" class="module-section">
                     <div class="card">
                         <div class="flex-between align-center">
                             <div>
-                                <h3><i class="fa-solid fa-rocket"></i> Tự Động Đẩy Sản Phẩm (Auto Boost 4h/lần)</h3>
-                                <p class="text-muted">Shopee cho phép đẩy 5 sản phẩm mỗi 4 tiếng để đưa sản phẩm lên đầu kết quả tìm kiếm 'Mới nhất'.</p>
+                                <h3><i class="fa-solid fa-rocket" style="color: #ec4899;"></i> Tự Động Đẩy Sản Phẩm (Pipeline 4 Nhóm Xoay Vòng Chuẩn GoSeller)</h3>
+                                <p class="text-muted">Cấu hình các nhóm sản phẩm (tối đa 5 SP/nhóm), tự động đẩy xoay vòng tuần hoàn mỗi 4 tiếng liên tục 24/7.</p>
                             </div>
-                            <div class="status-panel-compact">
-                                <span id="boostStatusBadge" class="badge-status badge-inactive">Đang dừng</span>
-                                <span id="boostCountdown" class="countdown-time">--:--:--</span>
+                            <div class="status-panel-compact" style="display: flex; align-items: center; gap: 10px;">
+                                <span id="boostStatusBadge" class="badge-status badge-inactive">⚪ Đang dừng</span>
+                                <span id="boostCountdownWrapper" class="countdown-badge" style="display: none;"><i class="fa-solid fa-clock"></i> Đang chạy: <strong id="boostGroupActiveName">Nhóm 1</strong> (<strong id="boostCountdown">--:--:--</strong>)</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Boost Alert Box -->
+                        <div id="boostLiveInfoBox" class="live-status-card mt-3" style="display: none;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="font-weight: 700; color: #10b981; font-size: 0.95rem;"><i class="fa-solid fa-bolt-lightning"></i> TIẾN TRÌNH ĐẨY PIPELINE 24/7 ĐANG HOẠT ĐỘNG</div>
+                                    <div id="boostLiveDetail" class="text-muted" style="font-size: 0.85rem; margin-top: 3px;">Đang đẩy Nhóm số 1, đếm ngược chuyển sang Nhóm số 2 sau 4 giờ...</div>
+                                </div>
+                                <button class="btn btn-sm btn-danger" onclick="stopBoostPipeline()"><i class="fa-solid fa-stop"></i> Dừng Tự Động Đẩy</button>
                             </div>
                         </div>
                         
                         <div class="grid-3 gap-3 mt-3">
                             <div class="form-group">
-                                <label>Chọn Shop Shopee:</label>
+                                <label><i class="fa-solid fa-store"></i> Chọn Shop Shopee:</label>
                                 <select id="boostAccountSelect" class="form-control" onchange="onBoostAccountChanged()"></select>
                             </div>
                             <div class="form-group">
-                                <label>Chế độ đẩy:</label>
-                                <select id="boostMode" class="form-control" onchange="toggleBoostMode()">
-                                    <option value="smart">Xoay tua tự động (Tất cả SP của Shop)</option>
-                                    <option value="selected">Chỉ định 5 sản phẩm ưu tiên đẩy bên dưới</option>
-                                </select>
+                                <label><i class="fa-solid fa-sliders"></i> Chế độ đẩy:</label>
+                                <div style="display: flex; gap: 6px; margin-top: 2px;">
+                                    <button id="btnTabPipeline" class="btn btn-primary btn-sm w-50" onclick="switchBoostModeView('pipeline')"><i class="fa-solid fa-diagram-project"></i> 4 Nhóm Xoay Vòng</button>
+                                    <button id="btnTabQuick" class="btn btn-outline btn-sm w-50" onclick="switchBoostModeView('quick')"><i class="fa-solid fa-list-check"></i> Đẩy Nhanh</button>
+                                </div>
                             </div>
                             <div class="form-group" style="display: flex; align-items: flex-end;">
-                                <button class="btn btn-primary w-100" onclick="fetchBoostShopProducts()"><i class="fa-solid fa-arrows-rotate"></i> Quét / Tải Sản Phẩm Shop</button>
+                                <button id="btnScanBoost" class="btn btn-primary w-100" onclick="fetchBoostShopProducts()"><i class="fa-solid fa-arrows-rotate"></i> Tải Danh Mục Sản Phẩm Shop</button>
                             </div>
                         </div>
 
-                        <!-- Bảng tìm kiếm và chọn sản phẩm để đẩy -->
-                        <div id="boostProductSelectionBox" class="mt-4" style="background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <!-- VIEW 1: GOSELLER 4-GROUP PIPELINE VIEW -->
+                        <div id="boostPipelineView" class="mt-4">
+                            <div class="flex-between align-center mb-3">
+                                <div>
+                                    <h4 style="margin: 0; color: #f8fafc;"><i class="fa-solid fa-rotate"></i> Sơ đồ Nhóm Đẩy Tự Động Cho Shop (<span id="boostPipelineShopName" style="color: #38bdf8;">Shop</span>)</h4>
+                                    <span class="text-muted" style="font-size: 0.82rem;">Mỗi nhóm chứa tối đa 5 sản phẩm. Hệ thống đếm ngược 4 tiếng mỗi nhóm rồi tự động chuyển nhóm kế tiếp.</span>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="btn btn-outline btn-sm" onclick="addNewBoostGroup()"><i class="fa-solid fa-plus"></i> Thêm 1 Nhóm Đẩy</button>
+                                    <button class="btn btn-outline btn-sm text-danger" onclick="clearAllBoostGroups()"><i class="fa-solid fa-trash-can"></i> Xóa Tất Cả</button>
+                                </div>
+                            </div>
+
+                            <!-- PIPELINE GROUPS CONTAINER -->
+                            <div id="boostPipelineContainer" class="boost-pipeline-container">
+                                <!-- Groups rendered dynamically by JavaScript -->
+                            </div>
+
+                            <!-- LOOP FOOTER -->
+                            <div class="pipeline-loop-footer">
+                                <div class="loop-arrow-badge"><i class="fa-solid fa-arrow-rotate-right"></i> ➔ VÒNG LẠI NHÓM ĐẦU TIÊN ➔ <i class="fa-solid fa-repeat"></i></div>
+                            </div>
+
+                            <!-- ACTION BAR -->
+                            <div class="action-bar mt-3 flex-wrap">
+                                <button id="btnStartPipeline" class="btn btn-success" onclick="startBoostPipeline()"><i class="fa-solid fa-play"></i> Bắt Đầu Tự Động Đẩy</button>
+                                <button id="btnStopPipeline" class="btn btn-danger" onclick="stopBoostPipeline()"><i class="fa-solid fa-stop"></i> Dừng Tự Động Đẩy</button>
+                                <button class="btn btn-primary" onclick="saveBoostGroupsToServer()"><i class="fa-solid fa-floppy-disk"></i> Lưu Cấu Hình Nhóm</button>
+                                <button class="btn btn-outline" onclick="openCurrentShopBrowser('boostAccountSelect')"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Kênh Người Bán Shopee</button>
+                            </div>
+                        </div>
+
+                        <!-- VIEW 2: QUICK BOOST SELECTION VIEW -->
+                        <div id="boostQuickView" class="mt-4" style="display: none;">
                             <div class="flex-between align-center mb-3">
                                 <div class="search-box-wrapper" style="flex: 1; max-width: 400px;">
                                     <input type="text" id="boostProductSearchInput" class="form-control" placeholder="🔍 Tìm kiếm sản phẩm theo tên..." oninput="filterBoostProductList()">
@@ -239,19 +324,18 @@
                                         <tr>
                                             <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
                                                 <i class="fa-solid fa-box-open" style="font-size: 2rem; margin-bottom: 8px; display: block; opacity: 0.5;"></i>
-                                                Nhấn <strong>"Quét / Tải Sản Phẩm Shop"</strong> để tải danh sách sản phẩm thực tế từ Kênh Người Bán.
+                                                Nhấn <strong>"Tải Danh Mục Sản Phẩm Shop"</strong> để lấy sản phẩm từ Kênh Người Bán.
                                             </td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
 
-                        <div class="action-bar mt-4 flex-wrap">
-                            <button class="btn btn-success" onclick="startAutoBoost()"><i class="fa-solid fa-play"></i> Đẩy Shop Đang Chọn</button>
-                            <button class="btn btn-primary" onclick="startAutoBoostAll()"><i class="fa-solid fa-rocket"></i> Chạy Tất Cả Shop</button>
-                            <button class="btn btn-danger" onclick="stopAutoBoost()"><i class="fa-solid fa-stop"></i> Dừng Đẩy</button>
-                            <button class="btn btn-outline" onclick="openCurrentShopBrowser('boostAccountSelect')"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Kênh Shopee Trên Trình Duyệt</button>
+                            <div class="action-bar mt-4 flex-wrap">
+                                <button class="btn btn-success" onclick="startQuickBoost()"><i class="fa-solid fa-play"></i> Đẩy 5 SP Đang Chọn</button>
+                                <button class="btn btn-primary" onclick="startAutoBoostAll()"><i class="fa-solid fa-rocket"></i> Chạy Tất Cả Shop (Smart)</button>
+                                <button class="btn btn-danger" onclick="stopAutoBoost()"><i class="fa-solid fa-stop"></i> Dừng Đẩy</button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -263,6 +347,19 @@
                             <div>
                                 <h3><i class="fa-solid fa-bolt"></i> Tự Động Tạo Flash Sale Của Shop</h3>
                                 <p class="text-muted">Tự động quét các khung giờ trống trong ngày trên Kênh Marketing và tạo chiến dịch Flash Sale để kích thích khách mua hàng.</p>
+                            </div>
+                            <div class="status-panel-compact" style="display: flex; align-items: center; gap: 10px;">
+                                <span id="flashsaleStatusBadge" class="badge-status badge-inactive">⚪ Sẵn sàng</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Flash Sale Alert Box -->
+                        <div id="flashsaleLiveInfoBox" class="live-status-card amber mt-3" style="display: none;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div style="font-weight: 700; color: #f59e0b; font-size: 0.95rem;"><i class="fa-solid fa-bolt"></i> ĐANG TẠO CHIẾN DỊCH FLASH SALE</div>
+                                    <div id="flashsaleLiveDetail" class="text-muted" style="font-size: 0.85rem; margin-top: 3px;">Đang quét khung giờ và nạp sản phẩm...</div>
+                                </div>
                             </div>
                         </div>
                         
@@ -544,13 +641,28 @@
                     </div>
                 </section>
 
-                <!-- LOG CONSOLE -->
+                <!-- CYBERPUNK LIVE LOG CONSOLE -->
                 <div class="log-console mt-4">
                     <div class="log-header">
-                        <span><i class="fa-solid fa-terminal"></i> Terminal Logs</span>
-                        <button class="btn-icon" onclick="document.getElementById('logOutput').innerHTML = ''"><i class="fa-solid fa-trash"></i></button>
+                        <div class="log-header-left">
+                            <div class="terminal-dots">
+                                <span class="terminal-dot dot-red"></span>
+                                <span class="terminal-dot dot-yellow"></span>
+                                <span class="terminal-dot dot-green"></span>
+                            </div>
+                            <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; letter-spacing: 0.04em;">
+                                <i class="fa-solid fa-terminal" style="color: var(--accent-cyan); margin-left: 6px;"></i> LIVE SYSTEM LOGS
+                            </span>
+                        </div>
+                        <div class="log-header-actions" style="display: flex; gap: 8px;">
+                            <button class="btn btn-outline btn-sm" onclick="document.getElementById('logOutput').innerHTML = ''" title="Xóa toàn bộ log">
+                                <i class="fa-solid fa-trash-can"></i> Xóa Log
+                            </button>
+                        </div>
                     </div>
-                    <div id="logOutput" class="log-body"></div>
+                    <div id="logOutput" class="log-body">
+                        <div style="color: var(--text-dim); font-style: italic;">[Hệ thống] EcomOmniTool Pro Suite đã sẵn sàng hoạt động. Chờ lệnh điều khiển...</div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -627,6 +739,13 @@
                     <select id="editAccountPlatform" class="form-control">
                         <option value="shopee">Shopee</option>
                         <option value="tiktok">TikTok</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Trạng thái kết nối:</label>
+                    <select id="editAccountStatus" class="form-control">
+                        <option value="Đã kết nối">🟢 Đã kết nối</option>
+                        <option value="Chưa kết nối">⚪ Chưa kết nối</option>
                     </select>
                 </div>
                 <div class="form-group mt-3" style="border-top: 1px solid var(--border-color); padding-top: 10px;">
@@ -716,9 +835,57 @@
         </div>
     </div>
 
+    <!-- MODAL CHỌN SẢN PHẨM CHO NHÓM ĐẨY (5 SP/NHÓM) -->
+    <div id="boostGroupProductModal" class="modal">
+        <div class="modal-content" style="max-width: 820px;">
+            <div class="modal-header">
+                <div>
+                    <h2 id="groupModalTitle" style="margin: 0; font-size: 1.2rem; color: #f8fafc;"><i class="fa-solid fa-boxes-stacked" style="color: #ec4899;"></i> Chọn 5 Sản Phẩm Cho Nhóm</h2>
+                    <p class="text-muted" style="margin-top: 4px; font-size: 0.85rem;">Tích chọn tối đa 5 sản phẩm để đưa vào nhóm đẩy này.</p>
+                </div>
+                <button class="modal-close" onclick="closeGroupProductModal()">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="flex-between align-center mb-3">
+                    <input type="text" id="groupProductModalSearch" class="form-control" placeholder="🔍 Tìm kiếm sản phẩm..." oninput="filterGroupProductModalList()" style="max-width: 380px;">
+                    <div style="font-size: 0.9rem;">
+                        <span class="text-muted">Đã chọn:</span> <strong id="groupModalSelectedCount" style="color: #38bdf8; font-size: 1.1rem;">0</strong> / 5 sản phẩm
+                    </div>
+                </div>
+
+                <div class="table-container" style="max-height: 420px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">Chọn</th>
+                                <th style="width: 60px;">Ảnh</th>
+                                <th>Tên Sản Phẩm</th>
+                                <th>Giá / Tồn Kho</th>
+                                <th>Trạng Thái</th>
+                            </tr>
+                        </thead>
+                        <tbody id="groupProductModalTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                                    Đang tải danh sách sản phẩm...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                <button class="btn btn-outline" onclick="closeGroupProductModal()">Hủy Bỏ</button>
+                <button class="btn btn-success" onclick="confirmGroupProductSelection()"><i class="fa-solid fa-check"></i> Xác Nhận Cho Nhóm Này</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications Container -->
     <div id="toast-container"></div>
 
-    <script src="/app.js?v=4"></script>
+    <script src="/app.js?v=20260927_083500"></script>
 </body>
 </html>

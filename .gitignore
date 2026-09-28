@@ -57,3 +57,8 @@ browser_profiles/
 Thumbs.db
 .vscode/
 .idea/
+
+# Binary executables
+*.exe
+*.msi
+*.dmg

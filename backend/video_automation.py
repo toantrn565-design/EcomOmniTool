@@ -198,28 +198,47 @@ class ShopeeVideoUploader:
             await self.init_browser(headless=False)
             self.page = await self.context.new_page()
             
-            # Đến thẳng trang đăng video
-            logger.info("Đang điều hướng tới trang upload để kiểm tra login...")
-            await self.safe_goto("https://banhang.shopee.vn/creator-center/video-upload/upload", wait_until="domcontentloaded")
-            await asyncio.sleep(5) # Đợi chuyển hướng nếu có
-            
-            current_url = self.page.url
-            logger.info(f"URL hiện tại sau khi kiểm tra login: {current_url}")
-            
-            # Nếu bị chuyển hướng sang trang đăng nhập, trang xác minh hoặc không còn ở creator-center
-            if "creator-center" not in current_url.lower() or any(term in current_url.lower() for term in ["login", "signin", "verify", "traffic", "accounts.shopee.vn"]):
-                logger.info("Chưa đăng nhập (phát hiện chuyển hướng hoặc url không hợp lệ).")
-                return False
-                
-            # Kiểm tra xem input file upload video có tồn tại trên page không để xác nhận thực sự truy cập được form
+            # 1. Kiểm tra cookie trong context
+            cookies = await self.context.cookies()
+            shopee_cookies = [c['name'].lower() for c in cookies if 'shopee' in c.get('domain', '').lower() or 'spc' in c.get('name', '').lower()]
+            has_auth_cookie = any(name in ['spc_ec', 'spc_st', 'spc_u', 'shopee_token', 'spc_cds', 'spc_t'] for name in shopee_cookies)
+
+            # 2. Điều hướng tới Kênh Người Bán
+            logger.info("Đang điều hướng tới Kênh Người Bán banhang.shopee.vn...")
             try:
-                file_input = self.page.locator("input[type='file']").first
-                await file_input.wait_for(state="attached", timeout=5000)
-                logger.info("Đã đăng nhập thành công (tìm thấy input file).")
+                await self.safe_goto("https://banhang.shopee.vn/", wait_until="domcontentloaded", timeout=25000)
+                await asyncio.sleep(4)
+                current_url = self.page.url.lower()
+                logger.info(f"URL hiện tại sau khi kiểm tra banhang.shopee.vn: {current_url}")
+                
+                # Nếu không bị đá sang trang đăng nhập/signin
+                if not any(term in current_url for term in ["/account/signin", "login", "accounts.shopee.vn"]):
+                    if "banhang.shopee.vn" in current_url or "portal" in current_url:
+                        logger.info("Đã đăng nhập thành công Kênh Người Bán Shopee!")
+                        return True
+            except Exception as e1:
+                logger.warning(f"Lỗi kiểm tra Kênh Người Bán: {e1}")
+
+            # 3. Điều hướng tới Creator Center Video Upload
+            logger.info("Đang điều hướng tới trang Creator Center để kiểm tra login...")
+            try:
+                await self.safe_goto("https://banhang.shopee.vn/creator-center/video-upload/upload", wait_until="domcontentloaded", timeout=25000)
+                await asyncio.sleep(4)
+                
+                current_url = self.page.url.lower()
+                logger.info(f"URL hiện tại sau khi kiểm tra creator-center: {current_url}")
+                
+                if "creator-center" in current_url and not any(term in current_url for term in ["login", "signin", "verify"]):
+                    logger.info("Đã đăng nhập thành công Creator Center!")
+                    return True
+            except Exception as e2:
+                logger.warning(f"Lỗi kiểm tra Creator Center: {e2}")
+
+            # 4. Fallback kiểm tra cookie xác thực nếu không bị chặn rõ ràng
+            if has_auth_cookie:
+                logger.info("Tìm thấy Cookie xác thực Shopee trong Profile.")
                 return True
-            except Exception:
-                logger.warning("Không tìm thấy input file trên trang upload. Đăng nhập có thể thất bại.")
-            
+                
             return False
         except Exception as e:
             logger.error(f"Lỗi khi kiểm tra trạng thái login: {e}")

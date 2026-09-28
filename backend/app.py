@@ -219,6 +219,26 @@ class InstantBoostRequest(BaseModel):
     account_id: str
     product_name: str
 
+class BoostProductItem(BaseModel):
+    id: Optional[str] = ""
+    name: str
+    image: Optional[str] = ""
+    price: Optional[str] = ""
+    stock: Optional[str] = ""
+
+class BoostGroupItem(BaseModel):
+    id: str
+    name: str
+    products: List[BoostProductItem] = []
+
+class SaveBoostGroupsRequest(BaseModel):
+    account_id: str
+    groups: List[BoostGroupItem]
+
+class StartBoostGroupsRequest(BaseModel):
+    account_id: str
+    start_group_index: int = 0
+
 class FlashSaleRequest(BaseModel):
     account_id: str
     discount_percent: int = 10
@@ -271,7 +291,7 @@ def add_or_update_account(account: AccountModel):
     if existing_idx >= 0:
         old_status = accounts[existing_idx].get("status", "Chưa kết nối")
         accounts[existing_idx] = account.dict()
-        if not account.status or account.status == "Chưa kết nối":
+        if not account.status:
             accounts[existing_idx]["status"] = old_status
     else:
         accounts.append(account.dict())
@@ -663,8 +683,48 @@ async def publish_product_bulk(request: PublishBulkRequest, background_tasks: Ba
 
 
 # ==========================================
-# MODULE 4: TỰ ĐỘNG ĐẨY SẢN PHẨM 4H (AUTO BOOST) - ĐA SHOP ĐỒNG THỜI
+# MODULE 4: TỰ ĐỘNG ĐẨY SẢN PHẨM 4H & PIPELINE 4 NHÓM XOAY VÒNG (AUTO BOOST)
 # ==========================================
+
+BOOST_GROUPS_FILE = os.path.join(CONFIG_DIR, "boost_groups.json")
+
+def load_all_boost_groups() -> dict:
+    if os.path.exists(BOOST_GROUPS_FILE):
+        try:
+            with open(BOOST_GROUPS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_all_boost_groups(data: dict):
+    with open(BOOST_GROUPS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+def get_shop_boost_groups(account_id: str) -> list:
+    all_groups = load_all_boost_groups()
+    if account_id in all_groups and all_groups[account_id]:
+        return all_groups[account_id]
+    # Default 4 groups
+    return [
+        {"id": "group_1", "name": "Đẩy nhóm số 1", "products": []},
+        {"id": "group_2", "name": "Đẩy nhóm số 2", "products": []},
+        {"id": "group_3", "name": "Đẩy nhóm số 3", "products": []},
+        {"id": "group_4", "name": "Đẩy nhóm số 4", "products": []},
+    ]
+
+class GroupBoosterTask:
+    def __init__(self, account_id: str):
+        self.account_id = account_id
+        self.is_running = False
+        self.stop_requested = False
+        self.current_group_index = 0
+        self.current_group_name = ""
+        self.next_run_time = 0
+        self.total_groups = 0
+        self.task: Optional[asyncio.Task] = None
+
+active_group_booster_tasks: Dict[str, GroupBoosterTask] = {}
 
 class ShopBoosterTask:
     def __init__(self, account_id: str):
@@ -675,6 +735,76 @@ class ShopBoosterTask:
         self.task: Optional[asyncio.Task] = None
 
 active_booster_tasks: Dict[str, ShopBoosterTask] = {}
+
+async def run_group_boost_loop(account_id: str, start_index: int = 0):
+    bstate = active_group_booster_tasks.get(account_id)
+    if not bstate:
+        return
+    try:
+        bstate.is_running = True
+        bstate.stop_requested = False
+        curr_idx = start_index
+
+        while not bstate.stop_requested:
+            groups = get_shop_boost_groups(account_id)
+            if not groups:
+                await log_to_ui(f"⚠️ Shop ID {account_id} chưa thiết lập nhóm đẩy nào.")
+                break
+
+            bstate.total_groups = len(groups)
+            if curr_idx >= len(groups):
+                curr_idx = 0
+            
+            group = groups[curr_idx]
+            group_name = group.get("name", f"Đẩy nhóm số {curr_idx + 1}")
+            bstate.current_group_index = curr_idx
+            bstate.current_group_name = group_name
+
+            accounts = load_accounts()
+            account = next((a for a in accounts if a["id"] == account_id), None)
+            if not account:
+                await log_to_ui(f"❌ Không tìm thấy tài khoản (ID: {account_id}) để đẩy sản phẩm.")
+                break
+
+            shop_name = account.get("name", "Shop")
+            profile_dir = account.get("profile_dir")
+            lock = get_profile_lock(profile_dir)
+
+            target_keywords = [p.get("name") for p in group.get("products", []) if p.get("name")]
+            mode = "strict" if target_keywords else "smart"
+
+            await log_to_ui(f"🚀 [Tự Động Đẩy] Kích hoạt {group_name} cho {shop_name} ({len(target_keywords)} sản phẩm)...")
+            async with lock:
+                booster = ShopeeProductBooster(profile_dir=profile_dir)
+                res = await booster.execute_boost(mode=mode, target_keywords=target_keywords, log_callback=log_to_ui)
+
+            # Khởi tạo chu kỳ 4 tiếng (14400s + 60s)
+            bstate.next_run_time = time.time() + (4 * 3600 + 60)
+            next_idx = (curr_idx + 1) % len(groups)
+            next_group_name = groups[next_idx].get("name", f"Đẩy nhóm số {next_idx + 1}")
+            await log_to_ui(f"⏳ [{shop_name}] {group_name} đang hoạt động. Đợt tiếp theo ({next_group_name}) sau 4 tiếng (lúc {time.strftime('%H:%M:%S', time.localtime(bstate.next_run_time))}).")
+
+            # Vòng lặp đếm ngược 4 tiếng
+            while time.time() < bstate.next_run_time:
+                if bstate.stop_requested:
+                    break
+                await asyncio.sleep(1)
+
+            if bstate.stop_requested:
+                break
+
+            # Chuyển nhóm tiếp theo (Tự động vòng lại nhóm 1 sau khi hết nhóm cuối)
+            curr_idx = next_idx
+            await log_to_ui(f"🔄 [{shop_name}] Chuyển vòng sang {next_group_name}...")
+
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        await log_to_ui(f"❌ Lỗi tiến trình đẩy nhóm ({account_id}): {e}")
+    finally:
+        bstate.is_running = False
+        if account_id in active_group_booster_tasks:
+            del active_group_booster_tasks[account_id]
 
 async def run_shop_boost_loop(account_id: str, mode: str, product_ids: Optional[List[str]]):
     bstate = active_booster_tasks.get(account_id)
@@ -764,6 +894,65 @@ async def get_boost_products(account_id: str):
         booster = ShopeeProductBooster(profile_dir=profile_dir)
         return await booster.get_products_list(log_callback=log_to_ui)
 
+@app.get("/api/boost/groups")
+def get_boost_groups_endpoint(account_id: str):
+    groups = get_shop_boost_groups(account_id)
+    bstate = active_group_booster_tasks.get(account_id)
+    is_running = bstate.is_running if bstate else False
+    current_index = bstate.current_group_index if bstate else 0
+    remaining = max(0, int(bstate.next_run_time - time.time())) if bstate and bstate.next_run_time > 0 else 0
+    
+    return {
+        "account_id": account_id,
+        "is_running": is_running,
+        "current_group_index": current_index,
+        "remaining_seconds": remaining,
+        "next_run_time": bstate.next_run_time if bstate else 0,
+        "groups": groups
+    }
+
+@app.post("/api/boost/groups/save")
+def save_boost_groups_endpoint(request: SaveBoostGroupsRequest):
+    all_groups = load_all_boost_groups()
+    all_groups[request.account_id] = [g.dict() for g in request.groups]
+    save_all_boost_groups(all_groups)
+    return {"status": "success", "message": f"Đã lưu cấu hình {len(request.groups)} nhóm đẩy thành công."}
+
+@app.post("/api/boost/groups/start")
+async def start_boost_groups_endpoint(request: StartBoostGroupsRequest):
+    accounts = load_accounts()
+    account = next((a for a in accounts if a["id"] == request.account_id), None)
+    if not account: raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản Shop.")
+    
+    aid = request.account_id
+    if aid in active_group_booster_tasks and active_group_booster_tasks[aid].is_running:
+        return {"status": "info", "message": "Tiến trình đẩy nhóm cho Shop này đang chạy."}
+
+    groups = get_shop_boost_groups(aid)
+    if not groups:
+        raise HTTPException(status_code=400, detail="Vui lòng thiết lập ít nhất 1 nhóm đẩy.")
+
+    bstate = GroupBoosterTask(aid)
+    active_group_booster_tasks[aid] = bstate
+    task = asyncio.create_task(run_group_boost_loop(aid, request.start_group_index))
+    bstate.task = task
+    
+    return {"status": "success", "message": f"Đã kích hoạt tự động đẩy xoay vòng {len(groups)} nhóm cho {account.get('name')}."}
+
+@app.post("/api/boost/groups/stop")
+def stop_boost_groups_endpoint(account_id: str):
+    bstate = active_group_booster_tasks.get(account_id)
+    if not bstate or not bstate.is_running:
+        return {"status": "info", "message": "Shop này hiện không chạy tiến trình đẩy nhóm nào."}
+    
+    bstate.stop_requested = True
+    if bstate.task and not bstate.task.done():
+        bstate.task.cancel()
+    if account_id in active_group_booster_tasks:
+        del active_group_booster_tasks[account_id]
+        
+    return {"status": "success", "message": "Đã dừng tiến trình tự động đẩy nhóm."}
+
 @app.post("/api/boost/instant")
 async def boost_single_product(request: InstantBoostRequest):
     accounts = load_accounts()
@@ -826,22 +1015,50 @@ def stop_boost(account_id: Optional[str] = None):
 @app.get("/api/boost/status")
 def get_boost_status():
     running_accounts = [aid for aid, b in active_booster_tasks.items() if b.is_running]
-    first_state = next((b for b in active_booster_tasks.values() if b.is_running), None)
+    running_groups = [aid for aid, b in active_group_booster_tasks.items() if b.is_running]
+    all_running = list(set(running_accounts + running_groups))
+    
+    first_state = next((b for b in active_group_booster_tasks.values() if b.is_running), None)
+    if not first_state:
+        first_state = next((b for b in active_booster_tasks.values() if b.is_running), None)
+        
     remaining = max(0, int(first_state.next_run_time - time.time())) if first_state and first_state.next_run_time > 0 else 0
     
     return {
-        "is_running": len(running_accounts) > 0,
-        "running_count": len(running_accounts),
-        "running_accounts": running_accounts,
-        "current_account_id": running_accounts[0] if running_accounts else "",
+        "is_running": len(all_running) > 0,
+        "running_count": len(all_running),
+        "running_accounts": all_running,
+        "current_account_id": all_running[0] if all_running else "",
         "remaining_seconds": remaining,
-        "next_run_time": first_state.next_run_time if first_state else 0
+        "next_run_time": first_state.next_run_time if first_state else 0,
+        "active_group_name": getattr(first_state, "current_group_name", "") if first_state else "",
+        "active_group_index": getattr(first_state, "current_group_index", 0) if first_state else 0
     }
 
 
 # ==========================================
 # MODULE 5: TỰ ĐỘNG FLASHSALE CỦA SHOP
 # ==========================================
+
+class FlashSaleState:
+    def __init__(self):
+        self.is_running = False
+        self.current_account_id = ""
+        self.current_shop_name = ""
+        self.last_run_time = 0
+        self.status_message = "Sẵn sàng"
+
+flashsale_state = FlashSaleState()
+
+@app.get("/api/flashsale/status")
+def get_flashsale_status():
+    return {
+        "is_running": flashsale_state.is_running,
+        "current_account_id": flashsale_state.current_account_id,
+        "current_shop_name": flashsale_state.current_shop_name,
+        "status_message": flashsale_state.status_message,
+        "last_run_time": flashsale_state.last_run_time
+    }
 
 @app.get("/api/flashsale/products")
 async def get_flashsale_products(account_id: str):
@@ -853,17 +1070,30 @@ async def run_flashsale_task(account_id: str, discount_percent: int, stock_per_i
     if not account:
         await log_to_ui(f"❌ Không tìm thấy tài khoản Flash Sale (ID: {account_id}).")
         return
+        
+    flashsale_state.is_running = True
+    flashsale_state.current_account_id = account_id
+    flashsale_state.current_shop_name = account.get("name", "Shop")
+    flashsale_state.status_message = f"Đang quét khung giờ & tạo Flash Sale cho {account.get('name', 'Shop')}..."
+    flashsale_state.last_run_time = time.time()
+    
     profile_dir = account.get("profile_dir")
     lock = get_profile_lock(profile_dir)
-    async with lock:
-        scheduler = FlashSaleScheduler(profile_dir=profile_dir)
-        await scheduler.auto_create_flashsale(
-            discount_percent=discount_percent,
-            stock_per_item=stock_per_item,
-            target_product_count=target_product_count,
-            selected_products=selected_products,
-            log_callback=log_to_ui
-        )
+    try:
+        async with lock:
+            scheduler = FlashSaleScheduler(profile_dir=profile_dir)
+            await scheduler.auto_create_flashsale(
+                discount_percent=discount_percent,
+                stock_per_item=stock_per_item,
+                target_product_count=target_product_count,
+                selected_products=selected_products,
+                log_callback=log_to_ui
+            )
+            flashsale_state.status_message = f"Hoàn thành tạo Flash Sale cho {account.get('name', 'Shop')}."
+    except Exception as e:
+        flashsale_state.status_message = f"Lỗi tạo Flash Sale: {str(e)}"
+    finally:
+        flashsale_state.is_running = False
 
 @app.post("/api/flashsale/trigger")
 def trigger_flashsale(request: FlashSaleRequest, background_tasks: BackgroundTasks):
